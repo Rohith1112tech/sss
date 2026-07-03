@@ -1192,25 +1192,6 @@ function renderExceptTab() {
         headers[4].style.display = '';
     }
 
-    if (!state.exceptions || state.exceptions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--text-secondary);">No teachers in the except list.</td></tr>';
-        return;
-    }
-    state.exceptions.forEach((ex, idx) => {
-        const tr = document.createElement('tr');
-        const actionCellHTML = `
-            <td>
-                <button class="btn btn-danger" style="padding:6px 14px; font-size:12px;" onclick="removeFromExcept('${ex.id}', '${ex.Teacher_Name}')">Remove</button>
-            </td>`;
-        tr.innerHTML = `
-            <td>${idx + 1}</td>
-            <td style="font-weight:600;">${ex.Teacher_Name}</td>
-            <td>${ex.Timing || 'All Periods'}</td>
-            <td>${ex.Reason || '—'}</td>
-            ${actionCellHTML}`;
-        tbody.appendChild(tr);
-    });
-
     // Populate except modal dropdown with ALL teachers
     const sel = document.getElementById('except-teacher-select');
     if (sel) {
@@ -1234,6 +1215,25 @@ function renderExceptTab() {
             timingSel.appendChild(opt);
         });
     }
+
+    if (!state.exceptions || state.exceptions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--text-secondary);">No teachers in the except list.</td></tr>';
+        return;
+    }
+    state.exceptions.forEach((ex, idx) => {
+        const tr = document.createElement('tr');
+        const actionCellHTML = `
+            <td>
+                <button class="btn btn-danger" style="padding:6px 14px; font-size:12px;" onclick="removeFromExcept('${ex.id}', '${ex.Teacher_Name}')">Remove</button>
+            </td>`;
+        tr.innerHTML = `
+            <td>${idx + 1}</td>
+            <td style="font-weight:600;">${ex.Teacher_Name}</td>
+            <td>${ex.Timing || 'All Periods'}</td>
+            <td>${ex.Reason || '—'}</td>
+            ${actionCellHTML}`;
+        tbody.appendChild(tr);
+    });
 }
 
 async function removeFromExcept(id, teacherName) {
