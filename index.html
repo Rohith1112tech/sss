@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>School Substitution System Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Custom CSS tweaks for timings board */
+    .timings-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .time-slot-card {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1 1 150px;
+      box-shadow: var(--card-shadow);
+      min-width: 140px;
+    }
+    .time-slot-name {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--primary-color);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .time-slot-val {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    .time-slot-meta {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Login Screen Overlay -->
+  <div id="login-overlay" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: var(--bg-primary); z-index: 9999; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(8px);">
+    <div class="card" style="width: 90%; max-width: 400px; padding: 32px; border-radius: 16px; border: 1px solid var(--border-color); background: var(--bg-secondary); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <div class="logo-icon" style="width: 48px; height: 48px; border-radius: 12px; background: var(--primary-color); color: #fff; font-size: 24px; font-weight: bold; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">S</div>
+        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 6px; color: var(--text-primary);">Welcome to SubManager</h2>
+        <p style="color: var(--text-secondary); font-size: 14px;">Sign in to manage substitutions</p>
+      </div>
+      <form id="login-form" style="display: flex; flex-direction: column; gap: 16px;">
+        <div class="form-group">
+          <label for="login-username" style="font-weight: 500; font-size: 13px;">Username</label>
+          <input type="text" id="login-username" placeholder="e.g. admin or teacher" required style="background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 12px; border-radius: 8px; font-size: 14px; outline: none;">
+        </div>
+        <div class="form-group">
+          <label for="login-password" style="font-weight: 500; font-size: 13px;">Password</label>
+          <input type="password" id="login-password" placeholder="Password" required style="background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 12px; border-radius: 8px; font-size: 14px; outline: none;">
+        </div>
+        <div id="login-error" style="color: var(--danger-color); font-size: 13px; text-align: center; display: none; font-weight: 500;">Invalid credentials.</div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 600; font-size: 14px; border: none; border-radius: 8px; background: var(--primary-color); color: white; cursor: pointer;">Sign In</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Sidebar Navigation -->
+  <aside class="sidebar">
+    <div class="logo-container">
+      <div class="logo-icon">S</div>
+      <div class="logo-text">SubManager</div>
+    </div>
+    <ul class="nav-links">
+      <li class="nav-item active" data-tab="tab-dashboard">
+        <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z"></path></svg>
+        <span>Dashboard</span>
+      </li>
+      <li class="nav-item" data-tab="tab-timetable">
+        <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+        <span>Master Timetable</span>
+      </li>
+      <li class="nav-item" data-tab="tab-teachers">
+        <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+        <span>Teacher Registry</span>
+      </li>
+      <li class="nav-item" data-tab="tab-classes">
+        <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+        <span>Class Registry</span>
+      </li>
+      <li class="nav-item" data-tab="tab-subjects">
+        <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+        <span>Subject Registry</span>
+      </li>
+      <li class="nav-item" data-tab="tab-timings">
+        <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <span>Timetable Registry</span>
+      </li>
+      <li class="nav-item" data-tab="tab-subassigned">
+        <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+        <span>Sub Assigned</span>
+      </li>
+      <li class="nav-item" data-tab="tab-except">
+        <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
+        <span>Except</span>
+      </li>
+    </ul>
+    <div class="sidebar-footer">
+      <button class="theme-toggle-btn" id="theme-toggle">☀️ Light Mode</button>
+    </div>
+  </aside>
+
+  <!-- Main Content Panel -->
+  <main class="main-content">
+    <header>
+      <div class="header-title">
+        <h1>Substitution Planner</h1>
+      </div>
+    </header>
+
+    <!-- Hidden date picker used by dashboard logic -->
+    <input type="date" id="selected-date" style="display:none;">
+
+    <!-- TAB 1: DASHBOARD VIEW -->
+    <section class="tab-view active" id="tab-dashboard">
+
+      <!-- Daily School Timings Board -->
+      <section class="timings-container" id="dashboard-timings-board">
+        <div class="time-slot-card">
+          <span class="time-slot-name">Class Incharge</span>
+          <span class="time-slot-val">08:45 - 09:30</span>
+          <span class="time-slot-meta">Morning Roll Call</span>
+        </div>
+        <div class="time-slot-card">
+          <span class="time-slot-name">Period 1</span>
+          <span class="time-slot-val">09:30 - 10:15</span>
+          <span class="time-slot-meta">Class Hour</span>
+        </div>
+        <div class="time-slot-card">
+          <span class="time-slot-name">Period 2</span>
+          <span class="time-slot-val">10:15 - 11:00</span>
+          <span class="time-slot-meta">Class Hour</span>
+        </div>
+        <div class="time-slot-card" style="border-color: var(--warning-color); background-color: var(--warning-glow);">
+          <span class="time-slot-name" style="color: var(--warning-color);">Morning Break</span>
+          <span class="time-slot-val">11:00 - 11:20</span>
+          <span class="time-slot-meta">20 mins interval</span>
+        </div>
+        <div class="time-slot-card">
+          <span class="time-slot-name">Period 3</span>
+          <span class="time-slot-val">11:20 - 12:00</span>
+          <span class="time-slot-meta">Class Hour</span>
+        </div>
+        <div class="time-slot-card">
+          <span class="time-slot-name">Period 4</span>
+          <span class="time-slot-val">12:00 - 12:40</span>
+          <span class="time-slot-meta">Class Hour</span>
+        </div>
+        <div class="time-slot-card" style="border-color: var(--primary-color); background-color: var(--primary-glow);">
+          <span class="time-slot-name" style="color: var(--primary-color);">Lunch Break</span>
+          <span class="time-slot-val">12:40 - 01:20</span>
+          <span class="time-slot-meta">40 mins lunch break</span>
+        </div>
+        <div class="time-slot-card">
+          <span class="time-slot-name">Period 5</span>
+          <span class="time-slot-val">01:20 - 02:00</span>
+          <span class="time-slot-meta">Class Hour</span>
+        </div>
+        <div class="time-slot-card">
+          <span class="time-slot-name">Period 6</span>
+          <span class="time-slot-val">02:00 - 02:40</span>
+          <span class="time-slot-meta">Class Hour</span>
+        </div>
+        <div class="time-slot-card" style="border-color: var(--warning-color); background-color: var(--warning-glow);">
+          <span class="time-slot-name" style="color: var(--warning-color);">Evening Break</span>
+          <span class="time-slot-val">02:40 - 02:50</span>
+          <span class="time-slot-meta">10 mins interval</span>
+        </div>
+        <div class="time-slot-card">
+          <span class="time-slot-name">Period 7</span>
+          <span class="time-slot-val">02:50 - 03:30</span>
+          <span class="time-slot-meta">Class Hour</span>
+        </div>
+        <div class="time-slot-card">
+          <span class="time-slot-name">Period 8</span>
+          <span class="time-slot-val">03:30 - 04:05</span>
+          <span class="time-slot-meta">Class Hour</span>
+        </div>
+        <div class="time-slot-card">
+          <span class="time-slot-name">Diary / Games</span>
+          <span class="time-slot-val">04:05 - 05:30</span>
+          <span class="time-slot-meta">Activity &amp; Departure</span>
+        </div>
+      </section>
+
+      <div class="dashboard-grid">
+        
+        <!-- Absence Logging Card -->
+        <div class="card" id="absence-logging-card">
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>Log Teacher Absence</h2>
+            <div style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-secondary);">
+              <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+              <input type="date" id="visible-date" style="background:var(--bg-tertiary); border:1px solid var(--border-color); border-radius:6px; padding:4px 8px; color:var(--text-primary); font-size:13px; cursor:pointer;">
+            </div>
+          </div>
+          <form id="absence-form" class="card-body">
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label for="absent-teacher-name">Select Teacher</label>
+              <select id="absent-teacher-name" required></select>
+            </div>
+            
+            <div class="form-row" style="margin-bottom: 12px;">
+              <div class="form-group">
+                <label for="absence-start-date">Start Date</label>
+                <input type="date" id="absence-start-date" required>
+              </div>
+              <div class="form-group">
+                <label for="absence-end-date">End Date (Optional)</label>
+                <input type="date" id="absence-end-date">
+              </div>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label for="absence-type">Absence Duration / Type</label>
+              <select id="absence-type" required>
+                <option value="Full Day">Full Day (All Periods)</option>
+                <option value="Half Day FN">Half Day FN (Periods 1 to 4)</option>
+                <option value="Half Day AN">Half Day AN (Periods 5 to 8)</option>
+                <option value="1-Hour Permission">1-Hour Permission (Specify Periods)</option>
+              </select>
+            </div>
+            
+            <!-- Period checkboxes (shown only for 1-Hour Permission) -->
+            <div class="form-group" id="periods-selection-wrapper" style="display: none; margin-bottom: 16px;">
+              <label>Select Periods Absent</label>
+              <div class="periods-checkbox-grid">
+                <div class="period-checkbox-wrapper">
+                  <input type="checkbox" id="p-check-1" value="1">
+                  <label for="p-check-1" class="period-checkbox-label">P1 (9:30-10:15)</label>
+                </div>
+                <div class="period-checkbox-wrapper">
+                  <input type="checkbox" id="p-check-2" value="2">
+                  <label for="p-check-2" class="period-checkbox-label">P2 (10:15-11:00)</label>
+                </div>
+                <div class="period-checkbox-wrapper">
+                  <input type="checkbox" id="p-check-3" value="3">
+                  <label for="p-check-3" class="period-checkbox-label">P3 (11:20-12:00)</label>
+                </div>
+                <div class="period-checkbox-wrapper">
+                  <input type="checkbox" id="p-check-4" value="4">
+                  <label for="p-check-4" class="period-checkbox-label">P4 (12:00-12:40)</label>
+                </div>
+                <div class="period-checkbox-wrapper">
+                  <input type="checkbox" id="p-check-5" value="5">
+                  <label for="p-check-5" class="period-checkbox-label">P5 (1:20-2:00)</label>
+                </div>
+                <div class="period-checkbox-wrapper">
+                  <input type="checkbox" id="p-check-6" value="6">
+                  <label for="p-check-6" class="period-checkbox-label">P6 (2:00-2:40)</label>
+                </div>
+                <div class="period-checkbox-wrapper">
+                  <input type="checkbox" id="p-check-7" value="7">
+                  <label for="p-check-7" class="period-checkbox-label">P7 (2:50-3:30)</label>
+                </div>
+                <div class="period-checkbox-wrapper">
+                  <input type="checkbox" id="p-check-8" value="8">
+                  <label for="p-check-8" class="period-checkbox-label">P8 (3:30-4:05)</label>
+                </div>
+              </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Add Leave Log</button>
+          </form>
+        </div>
+
+        <!-- Today's Absences Card -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Active Absences Today</h2>
+          </div>
+          <div class="absentees-list" id="today-absentees">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+      </div><!-- end dashboard-grid -->
+
+    </section>
+
+    <!-- TAB: SUB ASSIGNED -->
+    <section class="tab-view" id="tab-subassigned" style="min-width:0; width:100%;">
+      <div class="card" id="substitutions-card" style="min-width:0; overflow:hidden; width:100%; box-sizing:border-box;">
+        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <h2>Sub Assigned</h2>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-secondary);">
+              <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+              <input type="date" id="sub-assigned-date" style="background:var(--bg-tertiary); border:1px solid var(--border-color); border-radius:6px; padding:4px 8px; color:var(--text-primary); font-size:13px; cursor:pointer;">
+            </div>
+            <div style="position: relative; display: inline-block;">
+              <button class="btn btn-secondary" id="export-subs-btn">
+                <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                <span>Export</span>
+              </button>
+              <div id="export-dropdown-menu" style="display: none; position: absolute; right: 0; top: 110%; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 100; min-width: 140px;">
+                <button class="export-opt-btn" onclick="triggerExport('excel')" style="width: 100%; text-align: left; padding: 10px 14px; background: none; border: none; color: var(--text-primary); cursor: pointer; font-size: 13px; font-weight: 500; border-bottom: 1px solid var(--border-color); outline: none;">Excel File (CSV)</button>
+                <button class="export-opt-btn" onclick="triggerExport('pdf')" style="width: 100%; text-align: left; padding: 10px 14px; background: none; border: none; color: var(--text-primary); cursor: pointer; font-size: 13px; font-weight: 500; border-bottom: 1px solid var(--border-color); outline: none;">PDF Document</button>
+                <button class="export-opt-btn" onclick="triggerExport('jpeg')" style="width: 100%; text-align: left; padding: 10px 14px; background: none; border: none; color: var(--text-primary); cursor: pointer; font-size: 13px; font-weight: 500; outline: none;">JPEG Image</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="width:100%; overflow-x:auto; border-radius:8px; border:1px solid var(--border-color);">
+          <table style="min-width:1200px; width:100%; border-collapse:collapse; text-align:center; font-size:13px;">
+            <thead>
+              <tr>
+                <th style="white-space:nowrap; padding:12px 14px; background:var(--bg-tertiary); color:var(--text-secondary); font-weight:600; border:1px solid var(--border-color);">Absent Teacher</th>
+                <th style="white-space:nowrap; padding:12px 14px; background:var(--bg-tertiary); color:var(--text-secondary); font-weight:600; border:1px solid var(--border-color);">Date</th>
+                <th style="white-space:nowrap; padding:12px 14px; background:var(--bg-tertiary); color:var(--text-secondary); font-weight:600; border:1px solid var(--border-color);">Day</th>
+                <th style="white-space:nowrap; padding:12px 14px; background:var(--bg-tertiary); color:var(--text-secondary); font-weight:600; border:1px solid var(--border-color);">Morning Duty</th>
+                <th style="white-space:nowrap; padding:12px 14px; background:var(--bg-tertiary); color:var(--text-secondary); font-weight:600; border:1px solid var(--border-color);">P1</th>
+                <th style="white-space:nowrap; padding:12px 14px; background:var(--bg-tertiary); color:var(--text-secondary); font-weight:600; border:1px solid var(--border-color);">P2</th>
+                <th style="white-space:nowrap; padding:12px 14px; background:var(--bg-tertiary); color:var(--text-secondary); font-weight:600; border:1px solid var(--border-color);">P3</th>
+                <th style="white-space:nowrap; padding:12px 14px; background:var(--bg-tertiary); color:var(--text-secondary); font-weight:600; border:1px solid var(--border-color);">P4</th>
+                <th style="white-space:nowrap; padding:12px 14px; background:var(--bg-tertiary); color:var(--text-secondary); font-weight:600; border:1px solid var(--border-color);">P5</th>
+                <th style="white-space:nowrap; padding:12px 14px; background:var(--bg-tertiary); color:var(--text-secondary); font-weight:600; border:1px solid var(--border-color);">P6</th>
+                <th style="white-space:nowrap; padding:12px 14px; background:var(--bg-tertiary); color:var(--text-secondary); font-weight:600; border:1px solid var(--border-color);">P7</th>
+                <th style="white-space:nowrap; padding:12px 14px; background:var(--bg-tertiary); color:var(--text-secondary); font-weight:600; border:1px solid var(--border-color);">P8</th>
+                <th style="white-space:nowrap; padding:12px 14px; background:var(--bg-tertiary); color:var(--text-secondary); font-weight:600; border:1px solid var(--border-color);">Evening Duty</th>
+              </tr>
+            </thead>
+            <tbody id="substitutions-tbody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: MASTER TIMETABLE VIEW -->
+    <section class="tab-view" id="tab-timetable">
+      <div class="card">
+        <div class="card-header">
+          <h2>Weekly Timetable Grid Editor</h2>
+          <div class="search-container" style="display:flex; gap:16px; align-items:center;">
+            <div class="form-group" style="margin-bottom:0; flex-direction:row; align-items:center; gap:8px;">
+              <label for="filter-class" style="white-space:nowrap; margin-bottom:0; font-size:13px; font-weight:500;">Class:</label>
+              <select id="filter-class" onchange="filterTimetable()" style="padding:6px 12px; font-size:13px; border-radius:6px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); cursor:pointer; width:auto; min-width:120px;"></select>
+            </div>
+            <div class="form-group" style="margin-bottom:0; flex-direction:row; align-items:center; gap:8px;">
+              <label for="filter-teacher" style="white-space:nowrap; margin-bottom:0; font-size:13px; font-weight:500;">Teacher:</label>
+              <select id="filter-teacher" onchange="filterTimetable()" style="padding:6px 12px; font-size:13px; border-radius:6px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); cursor:pointer; width:auto; min-width:140px;"></select>
+            </div>
+          </div>
+        </div>
+        <div class="timetable-grid-wrapper table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Class</th>
+                <th>Day</th>
+                <th>P1 (9:30-10:15)</th>
+                <th>P2 (10:15-11:00)</th>
+                <th>P3 (11:20-12:00)</th>
+                <th>P4 (12:00-12:40)</th>
+                <th>P5 (1:20-2:00)</th>
+                <th>P6 (2:00-2:40)</th>
+                <th>P7 (2:50-3:30)</th>
+                <th>P8 (3:30-4:05)</th>
+              </tr>
+            </thead>
+            <tbody id="timetable-tbody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: TEACHER REGISTRY VIEW -->
+    <section class="tab-view" id="tab-teachers">
+      <div class="dashboard-grid" style="grid-template-columns: 1fr;">
+        
+        <!-- Teacher Registry List -->
+        <div class="card full-width">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Teacher Registry</h2>
+            <button class="btn btn-primary" id="open-add-teacher-modal-btn">Add Teacher</button>
+          </div>
+          <div class="table-wrapper" style="max-height: 400px; overflow-y: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Teacher Name</th>
+                  <th>Main Subject</th>
+                  <th>Type</th>
+                  <th>Max Load</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="teachers-tbody">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 4: CLASS REGISTRY VIEW -->
+    <section class="tab-view" id="tab-classes">
+      <div class="dashboard-grid" style="grid-template-columns: 1fr;">
+        
+        <!-- Class Registry List -->
+        <div class="card full-width">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Class Registry</h2>
+            <button class="btn btn-primary" id="open-add-class-modal-btn">Add Class</button>
+          </div>
+          <div class="table-wrapper" style="max-height: 400px; overflow-y: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Class Name</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="classes-tbody">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 5: TIMETABLE REGISTRY VIEW -->
+    <section class="tab-view" id="tab-timings">
+      <div class="dashboard-grid" style="grid-template-columns: 1fr;">
+
+        <!-- Timetable Registry List -->
+        <div class="card full-width">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Timetable Registry</h2>
+            <button class="btn btn-primary" id="open-add-timing-modal-btn">Add Timing Slot</button>
+          </div>
+          <div class="table-wrapper" style="max-height: 500px; overflow-y: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Slot Name</th>
+                  <th>Start Time</th>
+                  <th>End Time</th>
+                  <th>Description</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="timings-tbody">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 6: SUBJECT REGISTRY VIEW -->
+    <section class="tab-view" id="tab-subjects">
+      <div class="dashboard-grid" style="grid-template-columns: 1fr;">
+        
+        <!-- Subject Registry List -->
+        <div class="card full-width">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Subject Registry</h2>
+            <button class="btn btn-primary" id="open-add-subject-modal-btn">Add Subject</button>
+          </div>
+          <div class="table-wrapper" style="max-height: 400px; overflow-y: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Subject Name</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="subjects-tbody">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB: EXCEPT -->
+    <section class="tab-view" id="tab-except">
+      <div class="dashboard-grid" style="grid-template-columns: 1fr;">
+        <div class="card full-width" style="box-sizing:border-box;">
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>Except List</h2>
+            <button class="btn btn-primary" id="open-except-modal-btn">+ Add to Except</button>
+          </div>
+
+          <div class="table-wrapper" style="max-height: 400px; overflow-y: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Teacher Name</th>
+                  <th>Timing / Period</th>
+                  <th>Reason</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="except-tbody">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Timing Slot Modal Popup Screen -->
+  <div class="modal-overlay" id="timing-modal">
+    <div class="modal-content">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+        <h2 id="timing-form-title">Add New Timing Slot</h2>
+        <button type="button" class="btn btn-secondary" id="close-timing-modal-btn" style="padding: 2px 8px; font-size: 20px; font-weight: bold; background: none; border: none; color: var(--text-secondary); cursor: pointer;">&times;</button>
+      </div>
+      <form id="add-timing-form">
+        <input type="hidden" id="timing-slot-id">
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="timing-name">Period / Slot Name</label>
+          <input type="text" id="timing-name" placeholder="e.g. Period 1, Morning Break" required>
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="timing-start">Start Time</label>
+          <input type="text" id="timing-start" placeholder="e.g. 09:30" required>
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="timing-end">End Time</label>
+          <input type="text" id="timing-end" placeholder="e.g. 10:15" required>
+        </div>
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="timing-desc">Description / Type</label>
+          <input type="text" id="timing-desc" placeholder="e.g. Class Hour, 20 mins interval" required>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="submit" class="btn btn-primary" style="flex: 1;" id="timing-submit-btn">Add Slot</button>
+          <button type="button" class="btn btn-secondary" style="flex: 1;" id="timing-cancel-btn">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Teacher Modal Popup Screen -->
+  <div class="modal-overlay" id="teacher-modal">
+    <div class="modal-content">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+        <h2 id="teacher-form-title">Add New Teacher</h2>
+        <button type="button" class="btn btn-secondary" id="close-teacher-modal-btn" style="padding: 2px 8px; font-size: 20px; font-weight: bold; background: none; border: none; color: var(--text-secondary); cursor: pointer;">&times;</button>
+      </div>
+      <form id="add-teacher-form">
+        <input type="hidden" id="teacher-edit-mode" value="false">
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="new-teacher-name">Full Name</label>
+          <input type="text" id="new-teacher-name" placeholder="E.g., Srinivasan" required>
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="new-teacher-subject">Main Subject</label>
+          <select id="new-teacher-subject" required>
+            <!-- Dynamically populated -->
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="new-teacher-type">Teacher Type</label>
+          <select id="new-teacher-type" required>
+            <option value="Class Teacher">Class Teacher</option>
+            <option value="Non Class Teacher">Non Class Teacher</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="new-teacher-max">Workload Capacity (Periods per day)</label>
+          <input type="number" id="new-teacher-max" value="5" min="1" max="8" required>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="submit" class="btn btn-primary" style="flex: 1;" id="teacher-submit-btn">Register Teacher</button>
+          <button type="button" class="btn btn-secondary" style="flex: 1;" id="teacher-cancel-btn">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Class Modal Popup Screen -->
+  <div class="modal-overlay" id="class-modal">
+    <div class="modal-content">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+        <h2>Add New Class</h2>
+        <button type="button" class="btn btn-secondary" id="close-class-modal-btn" style="padding: 2px 8px; font-size: 20px; font-weight: bold; background: none; border: none; color: var(--text-secondary); cursor: pointer;">&times;</button>
+      </div>
+      <form id="add-class-form">
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="new-class-name">Class Name</label>
+          <input type="text" id="new-class-name" placeholder="e.g. 10-A, 12-G1" required>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Register Class</button>
+          <button type="button" class="btn btn-secondary" style="flex: 1;" id="class-cancel-btn">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Subject Modal Popup Screen -->
+  <div class="modal-overlay" id="subject-modal">
+    <div class="modal-content">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+        <h2>Add New Subject</h2>
+        <button type="button" class="btn btn-secondary" id="close-subject-modal-btn" style="padding: 2px 8px; font-size: 20px; font-weight: bold; background: none; border: none; color: var(--text-secondary); cursor: pointer;">&times;</button>
+      </div>
+      <form id="add-subject-form">
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="new-subject-name">Subject Name</label>
+          <input type="text" id="new-subject-name" placeholder="e.g. Mathematics, Physics" required>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Register Subject</button>
+          <button type="button" class="btn btn-secondary" style="flex: 1;" id="subject-cancel-btn">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+
+  <!-- Except Modal -->
+  <div class="modal-overlay" id="except-modal" style="display:none;">
+    <div class="modal-content" style="max-width:420px;">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+        <h3>Add Teacher to Except List</h3>
+        <button type="button" class="btn btn-secondary" id="close-except-modal-btn" style="padding: 2px 8px; font-size: 20px; font-weight: bold; background: none; border: none; color: var(--text-secondary); cursor: pointer;">&times;</button>
+      </div>
+      <form id="except-form" class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
+        <div class="form-group">
+          <label>Select Teacher</label>
+          <select id="except-teacher-select" required></select>
+        </div>
+        <div class="form-group">
+          <label>Timing / Period (Optional)</label>
+          <input type="text" id="except-timing" placeholder="e.g. All Periods, Morning Duty, P1-P4...">
+        </div>
+        <div class="form-group">
+          <label>Reason (Optional)</label>
+          <input type="text" id="except-reason" placeholder="e.g. HOD, Admin duty...">
+        </div>
+        <div style="display:flex; gap:12px; justify-content:flex-end;">
+          <button type="button" class="btn btn-secondary" id="except-cancel-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add to Except</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="app.js?v=2.6"></script>
+</body>
+</html>
