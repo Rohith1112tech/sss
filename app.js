@@ -2,8 +2,7 @@
  * School Substitution System - Web Logic (PostgreSQL Integration)
  */
 
-// Change this to your deployed Render backend URL (e.g., 'https://submanager-backend.onrender.com/api')
-const PROD_API_URL = 'https://YOUR_BACKEND_APP.onrender.com/api';
+const PROD_API_URL = 'https://submanager-backend-pspb.onrender.com/api';
 
 const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? 'http://localhost:3000/api'
