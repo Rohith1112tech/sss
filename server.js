@@ -2011,14 +2011,32 @@ async function initDatabase() {
         )
     `);
 
+    // Drop legacy primary key if exists to support multiple exceptions per teacher
+    try {
+        const pkCheck = await pool.query(`
+            SELECT a.attname
+            FROM   pg_index i
+            JOIN   pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+            WHERE  i.indrelid = 'exceptions'::regclass AND i.indisprimary
+        `);
+        if (pkCheck.rows.length === 1 && pkCheck.rows[0].attname === 'teacher_name') {
+            console.log("Migrating exceptions table: dropping primary key on teacher_name...");
+            await pool.query("ALTER TABLE exceptions DROP CONSTRAINT IF EXISTS exceptions_pkey CASCADE");
+        }
+    } catch (e) {
+        console.log("Exceptions PK migration check complete.");
+    }
+
     await pool.query(`
         CREATE TABLE IF NOT EXISTS exceptions (
-            teacher_name VARCHAR(100) PRIMARY KEY REFERENCES teachers(teacher_name) ON DELETE CASCADE,
+            id SERIAL PRIMARY KEY,
+            teacher_name VARCHAR(100) REFERENCES teachers(teacher_name) ON DELETE CASCADE,
             except_timing VARCHAR(200) DEFAULT 'All',
             reason VARCHAR(200),
             added_on TIMESTAMP DEFAULT NOW()
         )
     `);
+    await pool.query("ALTER TABLE exceptions ADD COLUMN IF NOT EXISTS id SERIAL PRIMARY KEY");
     await pool.query("ALTER TABLE exceptions ADD COLUMN IF NOT EXISTS except_timing VARCHAR(200) DEFAULT 'All'");
 
     await pool.query("DROP TABLE IF EXISTS period_timings");
@@ -2147,7 +2165,7 @@ app.get('/api/state', async (req, res) => {
         const classesRes = await pool.query("SELECT * FROM classes ORDER BY class_name");
         const subjectsRes = await pool.query("SELECT * FROM subjects ORDER BY subject_name");
         const timingsRes = await pool.query("SELECT * FROM period_timings ORDER BY id");
-        const exceptionsRes = await pool.query("SELECT teacher_name, except_timing, reason FROM exceptions ORDER BY teacher_name");
+        const exceptionsRes = await pool.query("SELECT id, teacher_name, except_timing, reason FROM exceptions ORDER BY teacher_name");
         
         const teachersData = teachersRes.rows.map(r => ({
             Teacher_Name: r.teacher_name,
@@ -2198,6 +2216,7 @@ app.get('/api/state', async (req, res) => {
             description: r.description
         }));
         const exceptionsData = exceptionsRes.rows.map(r => ({
+            id: r.id,
             Teacher_Name: r.teacher_name,
             Timing: r.except_timing || 'All',
             Reason: r.reason || ''
@@ -2443,7 +2462,7 @@ app.delete('/api/timings', async (req, res) => {
 // Get all exceptions
 app.get('/api/exceptions', async (req, res) => {
     try {
-        const result = await pool.query("SELECT teacher_name, except_timing, reason FROM exceptions ORDER BY teacher_name");
+        const result = await pool.query("SELECT id, teacher_name, except_timing, reason FROM exceptions ORDER BY teacher_name");
         res.json(result.rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2452,19 +2471,31 @@ app.get('/api/exceptions', async (req, res) => {
 app.post('/api/exceptions', async (req, res) => {
     const { Teacher_Name, Timing, Reason } = req.body;
     try {
-        await pool.query(
-            "INSERT INTO exceptions (teacher_name, except_timing, reason) VALUES ($1, $2, $3) ON CONFLICT (teacher_name) DO UPDATE SET except_timing = $2, reason = $3",
-            [Teacher_Name, Timing || 'All', Reason || '']
+        // Prevent duplicate exact teacher+timing combination
+        const check = await pool.query(
+            "SELECT 1 FROM exceptions WHERE teacher_name = $1 AND except_timing = $2",
+            [Teacher_Name, Timing || 'All']
         );
+        if (check.rowCount === 0) {
+            await pool.query(
+                "INSERT INTO exceptions (teacher_name, except_timing, reason) VALUES ($1, $2, $3)",
+                [Teacher_Name, Timing || 'All', Reason || '']
+            );
+        } else {
+            await pool.query(
+                "UPDATE exceptions SET reason = $3 WHERE teacher_name = $1 AND except_timing = $2",
+                [Teacher_Name, Timing || 'All', Reason || '']
+            );
+        }
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Remove teacher from exceptions
 app.delete('/api/exceptions', async (req, res) => {
-    const { Teacher_Name } = req.query;
+    const { id } = req.query;
     try {
-        await pool.query("DELETE FROM exceptions WHERE teacher_name = $1", [Teacher_Name]);
+        await pool.query("DELETE FROM exceptions WHERE id = $1", [parseInt(id, 10)]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });

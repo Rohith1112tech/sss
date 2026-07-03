@@ -1200,7 +1200,7 @@ function renderExceptTab() {
         const tr = document.createElement('tr');
         const actionCellHTML = `
             <td>
-                <button class="btn btn-danger" style="padding:6px 14px; font-size:12px;" onclick="removeFromExcept('${ex.Teacher_Name}')">Remove</button>
+                <button class="btn btn-danger" style="padding:6px 14px; font-size:12px;" onclick="removeFromExcept('${ex.id}', '${ex.Teacher_Name}')">Remove</button>
             </td>`;
         tr.innerHTML = `
             <td>${idx + 1}</td>
@@ -1211,23 +1211,34 @@ function renderExceptTab() {
         tbody.appendChild(tr);
     });
 
-    // Populate except modal dropdown with teachers NOT already excepted
-    const exceptedSet = new Set(state.exceptions.map(e => e.Teacher_Name));
+    // Populate except modal dropdown with ALL teachers
     const sel = document.getElementById('except-teacher-select');
-    sel.innerHTML = '';
-    state.teachers.forEach(t => {
-        if (!exceptedSet.has(t.Teacher_Name)) {
+    if (sel) {
+        sel.innerHTML = '';
+        state.teachers.forEach(t => {
             const opt = document.createElement('option');
             opt.value = t.Teacher_Name;
             opt.textContent = t.Teacher_Name;
             sel.appendChild(opt);
-        }
-    });
+        });
+    }
+
+    // Populate except timing select dropdown dynamically with all periods
+    const timingSel = document.getElementById('except-timing');
+    if (timingSel) {
+        timingSel.innerHTML = '<option value="All">All Periods</option>';
+        state.timings.forEach(time => {
+            const opt = document.createElement('option');
+            opt.value = time.period_name;
+            opt.textContent = time.period_name;
+            timingSel.appendChild(opt);
+        });
+    }
 }
 
-async function removeFromExcept(teacherName) {
+async function removeFromExcept(id, teacherName) {
     if (!confirm(`Remove ${teacherName} from Except list?`)) return;
-    await fetch(`${API_BASE}/exceptions?Teacher_Name=${encodeURIComponent(teacherName)}`, { method: 'DELETE' });
+    await fetch(`${API_BASE}/exceptions?id=${id}`, { method: 'DELETE' });
     await fetchState();
     renderExceptTab();
 }
@@ -1251,7 +1262,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('except-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const teacherName = document.getElementById('except-teacher-select').value;
-        const timing = document.getElementById('except-timing').value.trim() || 'All';
+        const timing = document.getElementById('except-timing').value || 'All';
         const reason = document.getElementById('except-reason').value.trim();
         await fetch(`${API_BASE}/exceptions`, {
             method: 'POST',
@@ -1259,7 +1270,7 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify({ Teacher_Name: teacherName, Timing: timing, Reason: reason })
         });
         exceptModal.style.display = 'none';
-        document.getElementById('except-timing').value = '';
+        document.getElementById('except-timing').value = 'All';
         document.getElementById('except-reason').value = '';
         await fetchState();
         renderExceptTab();
