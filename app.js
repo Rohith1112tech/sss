@@ -1114,28 +1114,27 @@ window.triggerExport = function(format) {
 // ─── EXCEPT TAB ───────────────────────────────────────────
 
 function renderExceptTab() {
-    const isTeacherRole = localStorage.getItem('user_role') === 'Teacher';
     const tbody = document.getElementById('except-tbody');
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    // Toggle visibility of "+ Add to Except" button
+    // Always show "+ Add to Except" button
     const addBtn = document.getElementById('open-except-modal-btn');
-    if (addBtn) addBtn.style.display = isTeacherRole ? 'none' : 'block';
+    if (addBtn) addBtn.style.display = 'block';
 
-    // Toggle visibility of Action column header
+    // Always show Action column header
     const headers = document.querySelectorAll('#tab-except th');
     if (headers.length >= 5) {
-        headers[4].style.display = isTeacherRole ? 'none' : '';
+        headers[4].style.display = '';
     }
 
     if (!state.exceptions || state.exceptions.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${isTeacherRole ? 4 : 5}" style="text-align:center; padding:24px; color:var(--text-secondary);">No teachers in the except list.</td></tr>`;
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--text-secondary);">No teachers in the except list.</td></tr>';
         return;
     }
     state.exceptions.forEach((ex, idx) => {
         const tr = document.createElement('tr');
-        const actionCellHTML = isTeacherRole ? '' : `
+        const actionCellHTML = `
             <td>
                 <button class="btn btn-danger" style="padding:6px 14px; font-size:12px;" onclick="removeFromExcept('${ex.Teacher_Name}')">Remove</button>
             </td>`;
