@@ -2031,7 +2031,24 @@ async function initDatabase() {
             description VARCHAR(100)
         )
     `);
+    // Create users credentials table
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS users (
+            username VARCHAR(50) PRIMARY KEY,
+            password VARCHAR(100) NOT NULL,
+            role VARCHAR(20) NOT NULL
+        )
+    `);
     
+    // Seed default users if empty
+    const userCheck = await pool.query("SELECT COUNT(*) FROM users");
+    if (parseInt(userCheck.rows[0].count, 10) === 0) {
+        console.log("Seeding default users...");
+        await pool.query("INSERT INTO users (username, password, role) VALUES ('admin', 'admin123', 'Admin')");
+        await pool.query("INSERT INTO users (username, password, role) VALUES ('teacher', 'teacher123', 'Teacher')");
+        console.log("Default users seeded.");
+    }
+
     console.log("Tables verified.");
     
     // Seed data if empty
@@ -2198,6 +2215,55 @@ app.get('/api/state', async (req, res) => {
         });
     } catch (err) {
         console.error("Error fetching state:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Authentication login endpoint
+app.post('/api/login', async (req, res) => {
+    const { Username, Password } = req.body;
+    if (!Username || !Password) {
+        return res.json({ success: false, message: 'Username and password are required' });
+    }
+    try {
+        const result = await pool.query(
+            "SELECT username, role FROM users WHERE LOWER(username) = $1 AND password = $2",
+            [Username.trim().toLowerCase(), Password]
+        );
+        if (result.rows.length > 0) {
+            res.json({ success: true, role: result.rows[0].role, username: result.rows[0].username });
+        } else {
+            res.json({ success: false, message: 'Invalid username or password' });
+        }
+    } catch (err) {
+        console.error("Login error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Get current users configuration (Settings credentials)
+app.get('/api/settings/users', async (req, res) => {
+    try {
+        const result = await pool.query("SELECT username, role, password FROM users");
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Update credentials endpoint
+app.post('/api/settings/update-credentials', async (req, res) => {
+    const { Role, NewUsername, NewPassword } = req.body;
+    if (!Role || !NewUsername || !NewPassword) {
+        return res.status(400).json({ error: 'Role, Username and Password are required' });
+    }
+    try {
+        await pool.query(
+            "UPDATE users SET username = $1, password = $2 WHERE role = $3",
+            [NewUsername.trim(), NewPassword, Role]
+        );
+        res.json({ success: true });
+    } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });

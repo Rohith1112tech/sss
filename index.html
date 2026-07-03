@@ -107,6 +107,10 @@
         <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
         <span>Except</span>
       </li>
+      <li class="nav-item" data-tab="tab-settings">
+        <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+        <span>Settings</span>
+      </li>
     </ul>
     <div class="sidebar-footer">
       <button class="theme-toggle-btn" id="theme-toggle">☀️ Light Mode</button>
@@ -525,6 +529,49 @@
             </table>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- TAB: SETTINGS -->
+    <section class="tab-view" id="tab-settings">
+      <div class="dashboard-grid">
+        
+        <!-- Admin Credentials Card -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Admin Login Settings</h2>
+          </div>
+          <form id="settings-admin-form" class="card-body" style="display:flex; flex-direction:column; gap:16px;">
+            <div class="form-group">
+              <label for="settings-admin-username">Admin Username</label>
+              <input type="text" id="settings-admin-username" required style="background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); padding:10px; border-radius:6px;">
+            </div>
+            <div class="form-group">
+              <label for="settings-admin-password">Admin Password</label>
+              <input type="password" id="settings-admin-password" placeholder="Enter new password" required style="background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); padding:10px; border-radius:6px;">
+            </div>
+            <button type="submit" class="btn btn-primary">Update Admin Credentials</button>
+          </form>
+        </div>
+
+        <!-- Teacher Credentials Card -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Teacher Login Settings</h2>
+          </div>
+          <form id="settings-teacher-form" class="card-body" style="display:flex; flex-direction:column; gap:16px;">
+            <div class="form-group">
+              <label for="settings-teacher-username">Teacher Username</label>
+              <input type="text" id="settings-teacher-username" required style="background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); padding:10px; border-radius:6px;">
+            </div>
+            <div class="form-group">
+              <label for="settings-teacher-password">Teacher Password</label>
+              <input type="password" id="settings-teacher-password" placeholder="Enter new password" required style="background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); padding:10px; border-radius:6px;">
+            </div>
+            <button type="submit" class="btn btn-primary">Update Teacher Credentials</button>
+          </form>
+        </div>
+
       </div>
     </section>
 

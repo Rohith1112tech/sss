@@ -107,6 +107,7 @@ function initUI() {
             if (tabId === 'tab-timings') renderTimingsEditor();
             if (tabId === 'tab-subassigned') renderDashboard();
             if (tabId === 'tab-except') renderExceptTab();
+            if (tabId === 'tab-settings') loadSettingsTab();
         });
     });
     
@@ -155,6 +156,69 @@ function initUI() {
     
     // 5. Form Submissions
     
+    // Settings Forms submissions
+    const adminSettingsForm = document.getElementById('settings-admin-form');
+    if (adminSettingsForm) {
+        adminSettingsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const usernameVal = document.getElementById('settings-admin-username').value.trim();
+            const passwordVal = document.getElementById('settings-admin-password').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/settings/update-credentials`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        Role: 'Admin',
+                        NewUsername: usernameVal,
+                        NewPassword: passwordVal
+                    })
+                });
+                if (response.ok) {
+                    alert('Admin credentials updated successfully! You will be logged out to verify.');
+                    const logoutBtn = document.getElementById('logout-btn');
+                    if (logoutBtn) logoutBtn.click();
+                    else showLoginOverlay();
+                } else {
+                    const data = await response.json();
+                    alert('Failed to update credentials: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Connection error: ' + err.message);
+            }
+        });
+    }
+
+    const teacherSettingsForm = document.getElementById('settings-teacher-form');
+    if (teacherSettingsForm) {
+        teacherSettingsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const usernameVal = document.getElementById('settings-teacher-username').value.trim();
+            const passwordVal = document.getElementById('settings-teacher-password').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/settings/update-credentials`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        Role: 'Teacher',
+                        NewUsername: usernameVal,
+                        NewPassword: passwordVal
+                    })
+                });
+                if (response.ok) {
+                    alert('Teacher credentials updated successfully!');
+                    loadSettingsTab();
+                } else {
+                    const data = await response.json();
+                    alert('Failed to update credentials: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Connection error: ' + err.message);
+            }
+        });
+    }
+
     // Absence Form
     const absenceForm = document.getElementById('absence-form');
     absenceForm.addEventListener('submit', async (e) => {
@@ -1265,7 +1329,7 @@ function applyRoleAccess() {
     const username = localStorage.getItem('user_username') || '';
     
     // Hide or show sidebar items based on role
-    const adminNavs = document.querySelectorAll('.nav-item[data-tab="tab-timetable"], .nav-item[data-tab="tab-teachers"], .nav-item[data-tab="tab-classes"], .nav-item[data-tab="tab-subjects"], .nav-item[data-tab="tab-timings"]');
+    const adminNavs = document.querySelectorAll('.nav-item[data-tab="tab-timetable"], .nav-item[data-tab="tab-teachers"], .nav-item[data-tab="tab-classes"], .nav-item[data-tab="tab-subjects"], .nav-item[data-tab="tab-timings"], .nav-item[data-tab="tab-settings"]');
     
     // Keep Log Absence card visible for both Admins and Teachers so they can post leaves
     const absenceLoggingCard = document.getElementById('absence-logging-card');
@@ -1280,7 +1344,7 @@ function applyRoleAccess() {
         const activeNav = document.querySelector('.nav-item.active');
         if (activeNav) {
             const tabId = activeNav.dataset.tab;
-            if (['tab-timetable', 'tab-teachers', 'tab-classes', 'tab-subjects', 'tab-timings'].includes(tabId)) {
+            if (['tab-timetable', 'tab-teachers', 'tab-classes', 'tab-subjects', 'tab-timings', 'tab-settings'].includes(tabId)) {
                 // Switch to dashboard
                 document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
                 document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
@@ -1328,27 +1392,57 @@ function initLoginHandlers() {
     const loginForm = document.getElementById('login-form');
     if (!loginForm) return;
     
-    loginForm.addEventListener('submit', (e) => {
+    loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const usernameInput = document.getElementById('login-username').value.trim().toLowerCase();
+        const usernameInput = document.getElementById('login-username').value.trim();
         const passwordInput = document.getElementById('login-password').value;
         const errorDiv = document.getElementById('login-error');
         
         if (errorDiv) errorDiv.style.display = 'none';
         
-        if (usernameInput === 'admin' && passwordInput === 'admin123') {
-            localStorage.setItem('user_role', 'Admin');
-            localStorage.setItem('user_username', 'Admin');
-            verifySession();
-        } else if (usernameInput === 'teacher' && passwordInput === 'teacher123') {
-            localStorage.setItem('user_role', 'Teacher');
-            localStorage.setItem('user_username', 'Teacher');
-            verifySession();
-        } else {
+        try {
+            const response = await fetch(`${API_BASE}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ Username: usernameInput, Password: passwordInput })
+            });
+            const data = await response.json();
+            if (data.success) {
+                localStorage.setItem('user_role', data.role);
+                localStorage.setItem('user_username', data.username);
+                verifySession();
+            } else {
+                if (errorDiv) {
+                    errorDiv.textContent = data.message || 'Invalid username or password.';
+                    errorDiv.style.display = 'block';
+                }
+            }
+        } catch (err) {
+            console.error("Login request failed:", err);
             if (errorDiv) {
-                errorDiv.textContent = 'Invalid credentials (admin / admin123 or teacher / teacher123).';
+                errorDiv.textContent = 'Failed to connect to backend server.';
                 errorDiv.style.display = 'block';
             }
         }
     });
+}
+
+async function loadSettingsTab() {
+    try {
+        const response = await fetch(`${API_BASE}/settings/users`);
+        const users = await response.json();
+        const adminUser = users.find(u => u.role === 'Admin');
+        const teacherUser = users.find(u => u.role === 'Teacher');
+        
+        if (adminUser) {
+            document.getElementById('settings-admin-username').value = adminUser.username;
+            document.getElementById('settings-admin-password').value = adminUser.password;
+        }
+        if (teacherUser) {
+            document.getElementById('settings-teacher-username').value = teacherUser.username;
+            document.getElementById('settings-teacher-password').value = teacherUser.password;
+        }
+    } catch (err) {
+        console.error("Failed to load settings:", err);
+    }
 }
