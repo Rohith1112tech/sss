@@ -580,37 +580,27 @@ async function renderDashboard() {
         tbody.innerHTML = '';
     }
     
+    const sortedTimings = [...state.timings].sort((a, b) => a.start_time.localeCompare(b.start_time));
+    
     // Update substitutions table headers with custom slot names dynamically!
-    const subHeaders = document.querySelectorAll('#tab-dashboard table thead th');
-    if (subHeaders.length >= 13) {
-        // Col 3: Morning Duty (period 0)
-        const t0 = state.timings.find(item => {
-            const name = item.period_name.trim().toLowerCase();
-            return ['class incharge', 'incharge', 'morning duty', 'morning roll call', 'roll call'].some(term => name.includes(term));
+    const theadRow = document.getElementById('substitutions-thead-row');
+    if (theadRow) {
+        theadRow.innerHTML = `
+            <th style="white-space:nowrap; padding:12px 14px; background:var(--bg-tertiary); color:var(--text-secondary); font-weight:600; border:1px solid var(--border-color);">Absent Teacher</th>
+            <th style="white-space:nowrap; padding:12px 14px; background:var(--bg-tertiary); color:var(--text-secondary); font-weight:600; border:1px solid var(--border-color);">Date</th>
+            <th style="white-space:nowrap; padding:12px 14px; background:var(--bg-tertiary); color:var(--text-secondary); font-weight:600; border:1px solid var(--border-color);">Day</th>
+        `;
+        sortedTimings.forEach(t => {
+            const th = document.createElement('th');
+            th.style = "white-space:nowrap; padding:12px 14px; background:var(--bg-tertiary); color:var(--text-secondary); font-weight:600; border:1px solid var(--border-color);";
+            th.innerText = t.period_name;
+            theadRow.appendChild(th);
         });
-        subHeaders[3].innerText = t0 ? t0.period_name : 'Class Incharge';
-
-        // Col 4-11: P1-P8 (periods 1-8)
-        for (let p = 1; p <= 8; p++) {
-            const t = state.timings.find(item => {
-                const name = item.period_name.trim().toLowerCase();
-                return name === `period ${p}` || name === `p${p}` || name === `p0${p}` || 
-                       name.includes(`p ${p}`) || name.includes(`period${p}`) ||
-                       ((name.startsWith('p') || name.startsWith('period')) && name.includes(String(p)));
-            });
-            subHeaders[p + 3].innerText = t ? t.period_name : `P${p}`;
-        }
-
-        // Col 12: Evening Duty (period 12)
-        const t12 = state.timings.find(item => {
-            const name = item.period_name.trim().toLowerCase();
-            return ['games', 'diary', 'activity', 'departure', 'evening duty'].some(term => name.includes(term));
-        });
-        subHeaders[12].innerText = t12 ? t12.period_name : 'Evening Duty';
     }
     
     if (absToday.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;color:var(--text-secondary);padding:24px;">No substitutions required today.</td></tr>';
+        const colSpanVal = 3 + sortedTimings.length;
+        tbody.innerHTML = `<tr><td colspan="${colSpanVal}" style="text-align:center;color:var(--text-secondary);padding:24px;">No substitutions required today.</td></tr>`;
         return;
     }
     
@@ -632,64 +622,77 @@ async function renderDashboard() {
         // Col 3: Day
         html += `<td>${dayName.substring(0, 3).toUpperCase()}</td>`;
         
-        // Col 4: Morning Duty (Period 0)
-        if (isCT) {
-            const classLabel = teacherRec.Class_Name || 'Morning Duty';
-            const log = subsToday.find(s => s.Absent_Teacher === name && parseInt(s.Period, 10) === 0);
-            if (log) {
-                const selector = isTeacherRole 
-                    ? `<div style="font-weight:600; color:var(--primary-color);">${log.Substitute_Teacher === 'MANUAL INTERVENTION REQUIRED' ? 'Unassigned' : log.Substitute_Teacher}</div>`
-                    : buildGridOverrideSelector(dateStr, dayName, classLabel, 0, name, log.Substitute_Teacher, subsToday);
-                html += `<td>
-                    <div style="font-size:10px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">${classLabel}</div>
-                    ${selector}
-                </td>`;
-            } else {
-                html += `<td style="color:var(--text-secondary); font-size:12px;">(Not Absent / Not CT)</td>`;
-            }
-        } else {
-            html += `<td style="color:var(--text-secondary); font-size:12px;">(Not Absent / Not CT)</td>`;
-        }
-        
-        // Col 5 to 12: Period 1 to 8
-        for (let p = 1; p <= 8; p++) {
-            const cls = findClassForTeacherPeriod(name, dayName, p);
-            if (cls) {
-                const log = subsToday.find(s => s.Absent_Teacher === name && parseInt(s.Period, 10) === p && s.Class === cls);
-                if (log) {
-                    const selector = isTeacherRole
-                        ? `<div style="font-weight:600; color:var(--primary-color);">${log.Substitute_Teacher === 'MANUAL INTERVENTION REQUIRED' ? 'Unassigned' : log.Substitute_Teacher}</div>`
-                        : buildGridOverrideSelector(dateStr, dayName, cls, p, name, log.Substitute_Teacher, subsToday);
-                    html += `<td>
-                        <div style="font-size:10px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">${cls}</div>
-                        ${selector}
-                    </td>`;
+        // Render each custom timing slot dynamically in chronological order
+        sortedTimings.forEach(slot => {
+            const slotName = slot.period_name;
+            const sp = getSupervisionIndexFromName(slotName);
+            
+            if (sp !== -1) {
+                // It is a supervision slot
+                if (isCT || sp !== 0) { // All teachers can do breaks/games, only CT does Class Incharge
+                    const classLabel = (sp === 0) ? (teacherRec.Class_Name || 'Morning Duty') 
+                                     : (sp === 12 ? 'Van duty' 
+                                     : slotName);
+                    
+                    const isAbsentForSlot = abs.Absence_Type === 'Full Day' || 
+                                            (abs.Absence_Type === 'Half Day FN' && (sp === 0 || sp === 9 || sp === 10)) ||
+                                            (abs.Absence_Type === 'Half Day AN' && (sp === 11 || sp === 12)) ||
+                                            (abs.Specific_Periods_Absent || '').split(',').map(s => s.trim().toLowerCase()).includes(slotName.toLowerCase());
+                    
+                    if (isAbsentForSlot) {
+                        const log = subsToday.find(s => s.Absent_Teacher === name && parseInt(s.Period, 10) === sp);
+                        if (log) {
+                            const selector = isTeacherRole 
+                                ? `<div style="font-weight:600; color:var(--primary-color);">${log.Substitute_Teacher === 'MANUAL INTERVENTION REQUIRED' ? 'Unassigned' : log.Substitute_Teacher}</div>`
+                                : buildGridOverrideSelector(dateStr, dayName, classLabel, sp, name, log.Substitute_Teacher, subsToday);
+                            html += `<td>
+                                <div style="font-size:10px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">${classLabel}</div>
+                                ${selector}
+                            </td>`;
+                        } else {
+                            html += `<td style="color:var(--text-secondary); font-size:12px;">- (Not Absent)</td>`;
+                        }
+                    } else {
+                        html += `<td style="color:var(--text-secondary); font-size:12px;">- (Not Absent)</td>`;
+                    }
                 } else {
-                    html += `<td style="color:var(--text-secondary); font-size:12px;">- (Not Absent)</td>`;
+                    html += `<td style="color:var(--text-secondary); font-size:12px;">(Not CT)</td>`;
                 }
             } else {
-                html += `<td style="color:var(--text-secondary); font-size:12px;">- (Not Absent)</td>`;
+                // It is a teaching period (P1 to P8)
+                const p = getPeriodNumberFromName(slotName);
+                if (p !== -1) {
+                    const cls = findClassForTeacherPeriod(name, dayName, p);
+                    if (cls) {
+                        const isAbsentForPeriod = abs.Absence_Type === 'Full Day' ||
+                                                  (abs.Absence_Type === 'Half Day FN' && p <= 4) ||
+                                                  (abs.Absence_Type === 'Half Day AN' && p >= 5) ||
+                                                  (abs.Specific_Periods_Absent || '').split(',').map(s => s.trim().toLowerCase()).includes(slotName.toLowerCase());
+                        
+                        if (isAbsentForPeriod) {
+                            const log = subsToday.find(s => s.Absent_Teacher === name && parseInt(s.Period, 10) === p && s.Class === cls);
+                            if (log) {
+                                const selector = isTeacherRole
+                                    ? `<div style="font-weight:600; color:var(--primary-color);">${log.Substitute_Teacher === 'MANUAL INTERVENTION REQUIRED' ? 'Unassigned' : log.Substitute_Teacher}</div>`
+                                    : buildGridOverrideSelector(dateStr, dayName, cls, p, name, log.Substitute_Teacher, subsToday);
+                                html += `<td>
+                                    <div style="font-size:10px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">${cls}</div>
+                                    ${selector}
+                                </td>`;
+                            } else {
+                                html += `<td style="color:var(--text-secondary); font-size:12px;">- (Not Absent)</td>`;
+                            }
+                        } else {
+                            html += `<td style="color:var(--text-secondary); font-size:12px;">- (Not Absent)</td>`;
+                        }
+                    } else {
+                        html += `<td style="color:var(--text-secondary); font-size:12px;">- (Not Absent)</td>`;
+                    }
+                } else {
+                    html += `<td style="color:var(--text-secondary); font-size:12px;">-</td>`;
+                }
             }
-        }
-        
-        // Col 13: Evening Duty (Period 12)
-        if (isCT) {
-            const classLabel = 'Evening Duty';
-            const log = subsToday.find(s => s.Absent_Teacher === name && parseInt(s.Period, 10) === 12);
-            if (log) {
-                const selector = isTeacherRole
-                    ? `<div style="font-weight:600; color:var(--primary-color);">${log.Substitute_Teacher === 'MANUAL INTERVENTION REQUIRED' ? 'Unassigned' : log.Substitute_Teacher}</div>`
-                    : buildGridOverrideSelector(dateStr, dayName, 'Van duty', 12, name, log.Substitute_Teacher, subsToday);
-                html += `<td>
-                    <div style="font-size:10px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Van duty</div>
-                    ${selector}
-                </td>`;
-            } else {
-                html += `<td style="color:var(--text-secondary); font-size:12px;">(Not Absent)</td>`;
-            }
-        } else {
-            html += `<td style="color:var(--text-secondary); font-size:12px;">(Not Absent)</td>`;
-        }
+        });
         
         tr.innerHTML = html;
         tbody.appendChild(tr);
@@ -1574,4 +1577,20 @@ async function loadSettingsTab() {
     } catch (err) {
         console.error("Failed to load settings:", err);
     }
+}
+
+function getSupervisionIndexFromName(name) {
+    const norm = name.trim().toLowerCase();
+    if (['class incharge', 'incharge', 'morning duty', 'morning roll call', 'roll call'].some(t => norm.includes(t))) return 0;
+    if (['morning break', 'break 1', 'interval 1'].some(t => norm.includes(t))) return 9;
+    if (['lunch break', 'lunch'].some(t => norm.includes(t))) return 10;
+    if (['evening break', 'break 2', 'interval 2'].some(t => norm.includes(t))) return 11;
+    if (['games', 'diary', 'activity', 'departure', 'evening duty'].some(t => norm.includes(t))) return 12;
+    return -1;
+}
+
+function getPeriodNumberFromName(name) {
+    const norm = name.trim().toLowerCase();
+    const match = norm.match(/(?:period|p)\s*(\d+)/i) || norm.match(/(\d+)/);
+    return match ? parseInt(match[1], 10) : -1;
 }
