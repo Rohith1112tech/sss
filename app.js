@@ -576,7 +576,38 @@ async function renderDashboard() {
     
     // 2. Render substitution table (Substituted Timetable Grid)
     const tbody = document.getElementById('substitutions-tbody');
-    tbody.innerHTML = '';
+    if (tbody) {
+        tbody.innerHTML = '';
+    }
+    
+    // Update substitutions table headers with custom slot names dynamically!
+    const subHeaders = document.querySelectorAll('#tab-dashboard table thead th');
+    if (subHeaders.length >= 13) {
+        // Col 3: Morning Duty (period 0)
+        const t0 = state.timings.find(item => {
+            const name = item.period_name.trim().toLowerCase();
+            return ['class incharge', 'incharge', 'morning duty', 'morning roll call', 'roll call'].some(term => name.includes(term));
+        });
+        subHeaders[3].innerText = t0 ? t0.period_name : 'Class Incharge';
+
+        // Col 4-11: P1-P8 (periods 1-8)
+        for (let p = 1; p <= 8; p++) {
+            const t = state.timings.find(item => {
+                const name = item.period_name.trim().toLowerCase();
+                return name === `period ${p}` || name === `p${p}` || name === `p0${p}` || 
+                       name.includes(`p ${p}`) || name.includes(`period${p}`) ||
+                       ((name.startsWith('p') || name.startsWith('period')) && name.includes(String(p)));
+            });
+            subHeaders[p + 3].innerText = t ? t.period_name : `P${p}`;
+        }
+
+        // Col 12: Evening Duty (period 12)
+        const t12 = state.timings.find(item => {
+            const name = item.period_name.trim().toLowerCase();
+            return ['games', 'diary', 'activity', 'departure', 'evening duty'].some(term => name.includes(term));
+        });
+        subHeaders[12].innerText = t12 ? t12.period_name : 'Evening Duty';
+    }
     
     if (absToday.length === 0) {
         tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;color:var(--text-secondary);padding:24px;">No substitutions required today.</td></tr>';
