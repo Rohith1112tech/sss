@@ -287,7 +287,11 @@ function initUI() {
     teacherForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const name = document.getElementById('new-teacher-name').value.trim();
-        const subject = document.getElementById('new-teacher-subject').value;
+        const selectedSubjects = [];
+        document.querySelectorAll('.subject-checkbox:checked').forEach(input => {
+            selectedSubjects.push(input.value);
+        });
+        const subject = selectedSubjects.join(', ') || 'General';
         const max = document.getElementById('new-teacher-max').value;
         const type = document.getElementById('new-teacher-type').value;
         const isEdit = document.getElementById('teacher-edit-mode').value === 'true';
@@ -1036,31 +1040,58 @@ async function deleteSubject(name) {
 }
 
 function populateSubjectDropdowns() {
-    const select = document.getElementById('new-teacher-subject');
-    if (!select) return;
+    const group = document.getElementById('subjects-checkbox-group');
+    if (!group) return;
     
-    const currentVal = select.value;
-    select.innerHTML = '';
+    const checkedValues = new Set(
+        Array.from(document.querySelectorAll('.subject-checkbox:checked')).map(el => el.value)
+    );
+    
+    group.innerHTML = '';
     
     state.subjects.forEach(sub => {
-        const option = document.createElement('option');
-        option.value = sub;
-        option.textContent = sub;
-        select.appendChild(option);
+        const div = document.createElement('div');
+        div.className = 'checkbox-item';
+        div.style.display = 'flex';
+        div.style.alignItems = 'center';
+        div.style.gap = '6px';
+        div.style.fontSize = '13px';
+        div.style.color = 'var(--text-primary)';
+        
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.value = sub;
+        input.id = `sub-check-${sub.replace(/\s+/g, '-')}`;
+        input.className = 'subject-checkbox';
+        input.style.cursor = 'pointer';
+        
+        if (checkedValues.has(sub)) {
+            input.checked = true;
+        }
+        
+        const label = document.createElement('label');
+        label.htmlFor = input.id;
+        label.textContent = sub;
+        label.style.cursor = 'pointer';
+        
+        div.appendChild(input);
+        div.appendChild(label);
+        group.appendChild(div);
     });
-    
-    if (state.subjects.includes(currentVal)) {
-        select.value = currentVal;
-    }
 }
 
 function editTeacher(name, subject, type, max) {
     document.getElementById('teacher-edit-mode').value = 'true';
     document.getElementById('new-teacher-name').value = name;
     document.getElementById('new-teacher-name').readOnly = true;
-    document.getElementById('new-teacher-subject').value = subject;
     document.getElementById('new-teacher-type').value = type;
     document.getElementById('new-teacher-max').value = max;
+    
+    // Check checkboxes for handled subjects
+    const handled = (subject || '').split(',').map(s => s.trim().toLowerCase());
+    document.querySelectorAll('.subject-checkbox').forEach(input => {
+        input.checked = handled.includes(input.value.trim().toLowerCase());
+    });
     
     document.getElementById('teacher-form-title').textContent = 'Edit Teacher Details';
     document.getElementById('teacher-submit-btn').textContent = 'Update Teacher';
@@ -1072,6 +1103,12 @@ function cancelTeacherEdit() {
     document.getElementById('teacher-edit-mode').value = 'false';
     document.getElementById('new-teacher-name').value = '';
     document.getElementById('new-teacher-name').readOnly = false;
+    
+    // Reset all checkboxes
+    document.querySelectorAll('.subject-checkbox').forEach(input => {
+        input.checked = false;
+    });
+    
     document.getElementById('add-teacher-form').reset();
     
     document.getElementById('teacher-form-title').textContent = 'Add New Teacher';

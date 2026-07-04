@@ -2857,8 +2857,11 @@ function findSubstituteForPeriod(req, activeSubs, teachers, timetable, absentees
             workload = calculateWorkload(teachers, timetable, name, day, date, activeSubs);
             maxCapacity = getTeacherMaxCapacity(teachers, name);
             if (workload >= maxCapacity) return;
-            
-            isSubjectMatch = teacherRecord.main_subject === subject;
+            isSubjectMatch = false;
+            if (teacherRecord.main_subject && subject) {
+                const subjectsList = teacherRecord.main_subject.split(',').map(s => s.trim().toLowerCase());
+                isSubjectMatch = subjectsList.includes(subject.trim().toLowerCase());
+            }
         }
         
         candidates.push({
