@@ -229,14 +229,24 @@ function initUI() {
         const type = document.getElementById('absence-type').value;
         
         let periods = 'All';
-        if (type === '1-Hour Permission') {
+        if (type === '40-Min Permission') {
             const selected = [];
-            for (let p = 1; p <= 8; p++) {
-                if (document.getElementById(`p-check-${p}`).checked) {
-                    selected.push(p);
-                }
+            document.querySelectorAll('.absence-period-checkbox:checked').forEach(cb => {
+                selected.push(cb.value);
+            });
+            if (selected.length > 0) {
+                const names = selected.map(val => {
+                    if (val === '0') return 'Class Incharge';
+                    if (val === '9') return 'Morning Break';
+                    if (val === '10') return 'Lunch Break';
+                    if (val === '11') return 'Evening Break';
+                    if (val === '12') return 'Diary / Games';
+                    return `Period ${val}`;
+                });
+                periods = names.join(', ');
+            } else {
+                periods = 'Period 1';
             }
-            periods = selected.length > 0 ? `Period ${selected.join(', ')}` : 'Period 1';
         }
         
         // Loop through dates and send post requests
@@ -461,11 +471,68 @@ function initUI() {
 function togglePeriodSelection() {
     const type = document.getElementById('absence-type').value;
     const grid = document.getElementById('periods-selection-wrapper');
-    if (type === '1-Hour Permission') {
+    if (type === '40-Min Permission') {
         grid.style.display = 'block';
     } else {
         grid.style.display = 'none';
     }
+}
+
+function populateAbsencePeriodsCheckboxes() {
+    const grid = document.getElementById('periods-checkbox-grid');
+    if (!grid) return;
+    
+    const checkedValues = new Set(
+        Array.from(document.querySelectorAll('.absence-period-checkbox:checked')).map(cb => cb.value)
+    );
+    
+    grid.innerHTML = '';
+    
+    state.timings.forEach(slot => {
+        let val = slot.period_name;
+        if (slot.period_name.startsWith('Period ')) {
+            val = slot.period_name.replace('Period ', '');
+        } else if (slot.period_name === 'Class Incharge' || slot.period_name === 'Morning Duty') {
+            val = '0';
+        } else if (slot.period_name === 'Morning Break') {
+            val = '9';
+        } else if (slot.period_name === 'Lunch' || slot.period_name === 'Lunch Break') {
+            val = '10';
+        } else if (slot.period_name === 'Evening Break') {
+            val = '11';
+        } else if (slot.period_name === 'Diary / Games' || slot.period_name === 'Games' || slot.period_name === 'Evening Duty') {
+            val = '12';
+        }
+        
+        const wrapper = document.createElement('div');
+        wrapper.className = 'period-checkbox-wrapper';
+        wrapper.style.display = 'flex';
+        wrapper.style.alignItems = 'center';
+        wrapper.style.gap = '6px';
+        wrapper.style.fontSize = '13px';
+        wrapper.style.color = 'var(--text-primary)';
+        
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.id = `p-check-${val}`;
+        input.value = val;
+        input.className = 'absence-period-checkbox';
+        input.style.cursor = 'pointer';
+        
+        if (checkedValues.has(val)) {
+            input.checked = true;
+        }
+        
+        const label = document.createElement('label');
+        label.htmlFor = input.id;
+        label.className = 'period-checkbox-label';
+        label.textContent = `${slot.period_name} (${slot.start_time}-${slot.end_time})`;
+        label.style.cursor = 'pointer';
+        
+        wrapper.appendChild(input);
+        wrapper.appendChild(label);
+        grid.appendChild(wrapper);
+    });
 }
 
 function populateTeacherDropdowns() {
@@ -1319,6 +1386,7 @@ function updateAllDropdowns() {
     populateTeacherDropdowns();
     populateTimetableFilters();
     renderExceptTab();
+    populateAbsencePeriodsCheckboxes();
 }
 
 function populateTimetableFilters() {

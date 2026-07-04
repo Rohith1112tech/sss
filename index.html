@@ -234,47 +234,16 @@
                 <option value="Full Day">Full Day (All Periods)</option>
                 <option value="Half Day FN">Half Day FN (Periods 1 to 4)</option>
                 <option value="Half Day AN">Half Day AN (Periods 5 to 8)</option>
-                <option value="1-Hour Permission">1-Hour Permission (Specify Periods)</option>
+                <option value="40-Min Permission">40-Min Permission (Specify Periods)</option>
               </select>
             </div>
             
-            <!-- Period checkboxes (shown only for 1-Hour Permission) -->
+            <!-- Period checkboxes (shown only for 40-Min Permission) -->
             <div class="form-group" id="periods-selection-wrapper" style="display: none; margin-bottom: 16px;">
-              <label>Select Periods Absent</label>
-              <div class="periods-checkbox-grid">
-                <div class="period-checkbox-wrapper">
-                  <input type="checkbox" id="p-check-1" value="1">
-                  <label for="p-check-1" class="period-checkbox-label">P1 (9:30-10:15)</label>
-                </div>
-                <div class="period-checkbox-wrapper">
-                  <input type="checkbox" id="p-check-2" value="2">
-                  <label for="p-check-2" class="period-checkbox-label">P2 (10:15-11:00)</label>
-                </div>
-                <div class="period-checkbox-wrapper">
-                  <input type="checkbox" id="p-check-3" value="3">
-                  <label for="p-check-3" class="period-checkbox-label">P3 (11:20-12:00)</label>
-                </div>
-                <div class="period-checkbox-wrapper">
-                  <input type="checkbox" id="p-check-4" value="4">
-                  <label for="p-check-4" class="period-checkbox-label">P4 (12:00-12:40)</label>
-                </div>
-                <div class="period-checkbox-wrapper">
-                  <input type="checkbox" id="p-check-5" value="5">
-                  <label for="p-check-5" class="period-checkbox-label">P5 (1:20-2:00)</label>
-                </div>
-                <div class="period-checkbox-wrapper">
-                  <input type="checkbox" id="p-check-6" value="6">
-                  <label for="p-check-6" class="period-checkbox-label">P6 (2:00-2:40)</label>
-                </div>
-                <div class="period-checkbox-wrapper">
-                  <input type="checkbox" id="p-check-7" value="7">
-                  <label for="p-check-7" class="period-checkbox-label">P7 (2:50-3:30)</label>
-                </div>
-                <div class="period-checkbox-wrapper">
-                  <input type="checkbox" id="p-check-8" value="8">
-                  <label for="p-check-8" class="period-checkbox-label">P8 (3:30-4:05)</label>
-                </div>
-              </div>
+               <label>Select Periods Absent</label>
+               <div class="periods-checkbox-grid" id="periods-checkbox-grid">
+                 <!-- Dynamically populated from timings config -->
+               </div>
             </div>
             
             <button type="submit" class="btn btn-primary" style="width: 100%;">Add Leave Log</button>
