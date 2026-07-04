@@ -1947,7 +1947,7 @@ async function initDatabase() {
         CREATE TABLE IF NOT EXISTS teachers (
             teacher_name VARCHAR(100) PRIMARY KEY,
             main_subject VARCHAR(100),
-            max_periods_per_day INT DEFAULT 5,
+            max_periods_per_day INT DEFAULT 25,
             class_name VARCHAR(50),
             teacher_type VARCHAR(50) DEFAULT 'Class Teacher'
         )
@@ -1956,6 +1956,7 @@ async function initDatabase() {
     // Migrations for existing databases
     await pool.query("ALTER TABLE teachers ADD COLUMN IF NOT EXISTS class_name VARCHAR(50)");
     await pool.query("ALTER TABLE teachers ADD COLUMN IF NOT EXISTS teacher_type VARCHAR(50) DEFAULT 'Class Teacher'");
+    await pool.query("UPDATE teachers SET max_periods_per_day = 25 WHERE max_periods_per_day <= 8");
     
     await pool.query(`
         CREATE TABLE IF NOT EXISTS timetable (
@@ -2823,7 +2824,7 @@ function getTeacherSubject(teachers, name) {
 
 function getTeacherMaxCapacity(teachers, name) {
     const t = teachers.find(item => item.teacher_name === name);
-    return t ? t.max_periods_per_day : 5;
+    return (t && t.max_periods_per_day > 8) ? t.max_periods_per_day : 25;
 }
 
 function getTeacherDailySchedule(timetable, name, day) {
