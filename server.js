@@ -2617,10 +2617,34 @@ app.post('/api/substitutions/calculate', async (req, res) => {
             return getPriority(b.class) - getPriority(a.class) || a.period - b.period;
         });
         
+        // Calculate Monday and Friday of the week for dateStr
+        const current = new Date(dateStr);
+        const diffToMonday = current.getDay() === 0 ? -6 : 1 - current.getDay();
+        const monday = new Date(current);
+        monday.setDate(current.getDate() + diffToMonday);
+        const mondayStr = monday.toISOString().split('T')[0];
+        
+        const friday = new Date(monday);
+        friday.setDate(monday.getDate() + 4);
+        const fridayStr = friday.toISOString().split('T')[0];
+        
+        // Query database for weekly substitutions of other days
+        const dbWeeklySubsRes = await pool.query(
+            `SELECT substitute_teacher, COUNT(*) as count 
+             FROM sub_log 
+             WHERE date >= $1::date AND date <= $2::date AND date <> $3::date
+             GROUP BY substitute_teacher`,
+            [mondayStr, fridayStr, dateStr]
+        );
+        const weeklySubMap = {};
+        dbWeeklySubsRes.rows.forEach(r => {
+            weeklySubMap[r.substitute_teacher] = parseInt(r.count, 10);
+        });
+
         const activeSubs = [];
         for (const req of requirements) {
-            // Pass exceptedMap so excepted teachers are not picked as substitutes for their excepted periods
-            const sub = findSubstituteForPeriod(req, activeSubs, teachersMap, timetableMap, absenteesRes.rows, exceptedMap);
+            // Pass exceptedMap and weeklySubMap
+            const sub = findSubstituteForPeriod(req, activeSubs, teachersMap, timetableMap, absenteesRes.rows, exceptedMap, weeklySubMap);
             await pool.query(
                 `INSERT INTO sub_log 
                 (date, day_name, period_num, class_name, subject_name, absent_teacher, substitute_teacher)
@@ -2776,8 +2800,20 @@ function calculateWorkload(teachers, timetable, name, day, date, activeSubs) {
     count += subsToday.length;
     return count;
 }
+function getWeeklyScheduledPeriodsCount(timetable, name) {
+    let count = 0;
+    const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+    timetable.forEach(row => {
+        if (days.includes(row.day_name)) {
+            for (let p = 1; p <= 8; p++) {
+                if (row[`period_${p}`] === name) count++;
+            }
+        }
+    });
+    return count;
+}
 
-function findSubstituteForPeriod(req, activeSubs, teachers, timetable, absentees, exceptedMap = {}) {
+function findSubstituteForPeriod(req, activeSubs, teachers, timetable, absentees, exceptedMap = {}, weeklySubMap = {}) {
     const { day, date, period, absentTeacher, subject } = req;
     const isSupervision = [0, 9, 10, 11, 12].includes(period);
     const periodKey = `Period_${period}`;
@@ -2823,7 +2859,7 @@ function findSubstituteForPeriod(req, activeSubs, teachers, timetable, absentees
         let hasSubbedToday = false;
         let hasAdjacentClass = false;
         let workload = 0;
-        let maxCapacity = 5;
+        let maxCapacity = 25;
         let isSubjectMatch = false;
         
         if (!isSupervision) {
@@ -2854,7 +2890,12 @@ function findSubstituteForPeriod(req, activeSubs, teachers, timetable, absentees
                 }
             }
             
-            workload = calculateWorkload(teachers, timetable, name, day, date, activeSubs);
+            // Calculate workload as weekly total (scheduled periods + weekly substitutions)
+            const weeklyScheduleCount = getWeeklyScheduledPeriodsCount(timetable, name);
+            const otherDaysSubCount = weeklySubMap[name] || 0;
+            const todaySubCount = activeSubs.filter(row => row.Date === date && row.Substitute_Teacher === name).length;
+            
+            workload = weeklyScheduleCount + otherDaysSubCount + todaySubCount;
             maxCapacity = getTeacherMaxCapacity(teachers, name);
             if (workload >= maxCapacity) return;
             isSubjectMatch = false;
