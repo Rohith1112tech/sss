@@ -234,19 +234,7 @@ function initUI() {
             document.querySelectorAll('.absence-period-checkbox:checked').forEach(cb => {
                 selected.push(cb.value);
             });
-            if (selected.length > 0) {
-                const names = selected.map(val => {
-                    if (val === '0') return 'Class Incharge';
-                    if (val === '9') return 'Morning Break';
-                    if (val === '10') return 'Lunch Break';
-                    if (val === '11') return 'Evening Break';
-                    if (val === '12') return 'Diary / Games';
-                    return `Period ${val}`;
-                });
-                periods = names.join(', ');
-            } else {
-                periods = 'Period 1';
-            }
+            periods = selected.length > 0 ? selected.join(', ') : 'Period 1';
         }
         
         // Loop through dates and send post requests
@@ -489,20 +477,7 @@ function populateAbsencePeriodsCheckboxes() {
     grid.innerHTML = '';
     
     state.timings.forEach(slot => {
-        let val = slot.period_name;
-        if (slot.period_name.startsWith('Period ')) {
-            val = slot.period_name.replace('Period ', '');
-        } else if (slot.period_name === 'Class Incharge' || slot.period_name === 'Morning Duty') {
-            val = '0';
-        } else if (slot.period_name === 'Morning Break') {
-            val = '9';
-        } else if (slot.period_name === 'Lunch' || slot.period_name === 'Lunch Break') {
-            val = '10';
-        } else if (slot.period_name === 'Evening Break') {
-            val = '11';
-        } else if (slot.period_name === 'Diary / Games' || slot.period_name === 'Games' || slot.period_name === 'Evening Duty') {
-            val = '12';
-        }
+        const val = slot.period_name;
         
         const wrapper = document.createElement('div');
         wrapper.className = 'period-checkbox-wrapper';
@@ -514,7 +489,7 @@ function populateAbsencePeriodsCheckboxes() {
         
         const input = document.createElement('input');
         input.type = 'checkbox';
-        input.id = `p-check-${val}`;
+        input.id = `p-check-${val.replace(/\s+/g, '-')}`;
         input.value = val;
         input.className = 'absence-period-checkbox';
         input.style.cursor = 'pointer';

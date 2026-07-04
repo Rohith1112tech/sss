@@ -2544,6 +2544,8 @@ app.post('/api/substitutions/calculate', async (req, res) => {
         const timetableRes = await pool.query("SELECT * FROM timetable");
         const absenteesRes = await pool.query("SELECT * FROM absentees WHERE date = $1 AND status = 'Absent'", [dateStr]);
         const exceptionsRes = await pool.query("SELECT teacher_name, except_timing FROM exceptions");
+        const timingsRes = await pool.query("SELECT * FROM period_timings ORDER BY id");
+        
         const exceptedMap = {};
         exceptionsRes.rows.forEach(r => {
             exceptedMap[r.teacher_name] = r.except_timing || 'All';
@@ -2551,6 +2553,7 @@ app.post('/api/substitutions/calculate', async (req, res) => {
         
         const teachersMap = teachersRes.rows;
         const timetableMap = timetableRes.rows;
+        const timingsMap = timingsRes.rows;
         const absentNames = absenteesRes.rows.map(r => r.teacher_name);
         
         await pool.query("DELETE FROM sub_log WHERE date = $1", [dateStr]);
@@ -2564,10 +2567,10 @@ app.post('/api/substitutions/calculate', async (req, res) => {
                     const key = `period_${p}`;
                     const teacher = row[key];
                     if (teacher && teacher !== 'Free' && absentNames.includes(teacher)) {
-                        const isAbsent = isTeacherAbsentForPeriod(absenteesRes.rows, teacher, p);
+                        const isAbsent = isTeacherAbsentForPeriod(absenteesRes.rows, teacher, p, timingsMap);
                         if (isAbsent) {
                             // If absent teacher is excepted for this specific period — skip creating requirement (no sub assigned)
-                            if (exceptedMap.hasOwnProperty(teacher) && isPeriodCoveredByTiming(exceptedMap[teacher], p)) {
+                            if (exceptedMap.hasOwnProperty(teacher) && isPeriodCoveredByTiming(exceptedMap[teacher], p, timingsMap)) {
                                 return;
                             }
                             requirements.push({
@@ -2590,9 +2593,9 @@ app.post('/api/substitutions/calculate', async (req, res) => {
             if (record && record.teacher_type === 'Class Teacher' && record.class_name) {
                 const specialPeriods = [0, 9, 10, 11, 12];
                 specialPeriods.forEach(sp => {
-                    if (isAbsentForSupervision(absentee, sp)) {
+                    if (isAbsentForSupervision(absentee, sp, timingsMap)) {
                         // Skip supervision requirement if excepted for this specific slot
-                        if (exceptedMap.hasOwnProperty(name) && isPeriodCoveredByTiming(exceptedMap[name], sp)) {
+                        if (exceptedMap.hasOwnProperty(name) && isPeriodCoveredByTiming(exceptedMap[name], sp, timingsMap)) {
                             return;
                         }
                         requirements.push({
@@ -2643,8 +2646,8 @@ app.post('/api/substitutions/calculate', async (req, res) => {
 
         const activeSubs = [];
         for (const req of requirements) {
-            // Pass exceptedMap and weeklySubMap
-            const sub = findSubstituteForPeriod(req, activeSubs, teachersMap, timetableMap, absenteesRes.rows, exceptedMap, weeklySubMap);
+            // Pass exceptedMap, weeklySubMap, and timingsMap
+            const sub = findSubstituteForPeriod(req, activeSubs, teachersMap, timetableMap, absenteesRes.rows, exceptedMap, weeklySubMap, timingsMap);
             await pool.query(
                 `INSERT INTO sub_log 
                 (date, day_name, period_num, class_name, subject_name, absent_teacher, substitute_teacher)
@@ -2672,10 +2675,43 @@ app.post('/api/substitutions/calculate', async (req, res) => {
     }
 });
 
-function isPeriodCoveredByTiming(timingStr, period) {
+const getSlotForPeriod = (p, timings) => {
+    return timings.find(item => {
+        const name = item.period_name.trim().toLowerCase();
+        return name === `period ${p}` || name === `p${p}` || name === `p0${p}` || 
+               name.includes(`p ${p}`) || name.includes(`period${p}`) ||
+               ((name.startsWith('p') || name.startsWith('period')) && name.includes(String(p)));
+    });
+};
+
+const getSlotForSupervision = (sp, timings) => {
+    const terms = {
+        0: ['class incharge', 'incharge', 'morning duty', 'morning roll call', 'roll call'],
+        9: ['morning break', 'break 1', 'interval 1'],
+        10: ['lunch break', 'lunch'],
+        11: ['evening break', 'break 2', 'interval 2'],
+        12: ['games', 'diary', 'activity', 'departure', 'evening duty']
+    }[sp] || [];
+    return timings.find(item => {
+        const name = item.period_name.trim().toLowerCase();
+        return terms.some(t => name.includes(t));
+    });
+};
+
+function isPeriodCoveredByTiming(timingStr, period, timingsMap = []) {
     if (!timingStr) return true; // Default to 'All'
     const normalized = timingStr.trim().toLowerCase();
     if (normalized === 'all' || normalized === 'all periods' || normalized === '') return true;
+
+    const isSupervision = [0, 9, 10, 11, 12].includes(period);
+    const slot = isSupervision ? getSlotForSupervision(period, timingsMap) : getSlotForPeriod(period, timingsMap);
+    if (slot) {
+        const slotName = slot.period_name.trim().toLowerCase();
+        const list = normalized.split(',').map(s => s.trim().toLowerCase());
+        if (list.includes(slotName)) {
+            return true;
+        }
+    }
 
     // Map supervision periods to names
     const periodNamesMap = {
@@ -2714,10 +2750,20 @@ function isPeriodCoveredByTiming(timingStr, period) {
     return false;
 }
 
-function isAbsentForSupervision(absenceRecord, supervisionPeriod) {
+function isAbsentForSupervision(absenceRecord, supervisionPeriod, timingsMap = []) {
     if (!absenceRecord) return false;
     const type = absenceRecord.absence_type;
     if (type === 'Full Day') return true;
+    
+    const periods = absenceRecord.specific_periods_absent || 'All';
+    const slot = getSlotForSupervision(supervisionPeriod, timingsMap);
+    if (slot) {
+        const slotName = slot.period_name.trim().toLowerCase();
+        const absentList = periods.split(',').map(s => s.trim().toLowerCase());
+        if (absentList.includes(slotName)) {
+            return true;
+        }
+    }
     
     // Map supervision periods to representative teaching periods:
     // 0 (Class Incharge) -> Period 1
@@ -2732,10 +2778,10 @@ function isAbsentForSupervision(absenceRecord, supervisionPeriod) {
     if (supervisionPeriod === 11) checkPeriod = 6;
     if (supervisionPeriod === 12) checkPeriod = 8;
     
-    return isTeacherAbsentForPeriod([absenceRecord], absenceRecord.teacher_name, checkPeriod);
+    return isTeacherAbsentForPeriod([absenceRecord], absenceRecord.teacher_name, checkPeriod, timingsMap);
 }
 
-function isTeacherAbsentForPeriod(absentees, name, period) {
+function isTeacherAbsentForPeriod(absentees, name, period, timingsMap = []) {
     const record = absentees.find(r => r.teacher_name === name);
     if (!record) return false;
     
@@ -2745,6 +2791,15 @@ function isTeacherAbsentForPeriod(absentees, name, period) {
     if (type === 'Full Day') return true;
     if (type === 'Half Day FN') return period <= 4;
     if (type === 'Half Day AN') return period >= 5;
+    
+    const slot = getSlotForPeriod(period, timingsMap);
+    if (slot) {
+        const slotName = slot.period_name.trim().toLowerCase();
+        const absentList = periods.split(',').map(s => s.trim().toLowerCase());
+        if (absentList.includes(slotName)) {
+            return true;
+        }
+    }
     
     const normalized = periods.toLowerCase();
     if (normalized.includes('all')) return true;
@@ -2813,7 +2868,7 @@ function getWeeklyScheduledPeriodsCount(timetable, name) {
     return count;
 }
 
-function findSubstituteForPeriod(req, activeSubs, teachers, timetable, absentees, exceptedMap = {}, weeklySubMap = {}) {
+function findSubstituteForPeriod(req, activeSubs, teachers, timetable, absentees, exceptedMap = {}, weeklySubMap = {}, timingsMap = []) {
     const { day, date, period, absentTeacher, subject } = req;
     const isSupervision = [0, 9, 10, 11, 12].includes(period);
     const periodKey = `Period_${period}`;
@@ -2825,14 +2880,14 @@ function findSubstituteForPeriod(req, activeSubs, teachers, timetable, absentees
         if (!name || name === absentTeacher) return;
         
         // Skip teachers who are in the exceptions list for this period
-        if (exceptedMap.hasOwnProperty(name) && isPeriodCoveredByTiming(exceptedMap[name], period)) return;
+        if (exceptedMap.hasOwnProperty(name) && isPeriodCoveredByTiming(exceptedMap[name], period, timingsMap)) return;
         
         // 1. Check if the candidate is absent
         if (isSupervision) {
             const absRecord = absentees.find(r => r.teacher_name === name);
-            if (absRecord && isAbsentForSupervision(absRecord, period)) return;
+            if (absRecord && isAbsentForSupervision(absRecord, period, timingsMap)) return;
         } else {
-            if (isTeacherAbsentForPeriod(absentees, name, period)) return;
+            if (isTeacherAbsentForPeriod(absentees, name, period, timingsMap)) return;
         }
         
         // 2. Class Type validation
