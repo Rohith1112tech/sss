@@ -756,11 +756,18 @@ async function cancelAbsence(name, dateStr) {
 function renderTimetableTab() {
     const headers = document.querySelectorAll('#tab-timetable thead th');
     for (let p = 1; p <= 8; p++) {
-        const name = `Period ${p}`;
-        const t = state.timings.find(item => item.period_name === name);
+        // Find matching timing slot based on standard naming (e.g. Period 1, P1, Period01, etc.)
+        const t = state.timings.find(item => {
+            const name = item.period_name.trim().toLowerCase();
+            return name === `period ${p}` || name === `p${p}` || name === `p0${p}` || 
+                   name.includes(`p ${p}`) || name.includes(`period${p}`) ||
+                   ((name.startsWith('p') || name.startsWith('period')) && name.includes(String(p)));
+        });
+        
+        const displayName = t ? t.period_name : `P${p}`;
         const suffix = t ? ` (${t.start_time}-${t.end_time})` : '';
         if (headers[p + 1]) {
-            headers[p + 1].innerText = `P${p}${suffix}`;
+            headers[p + 1].innerText = `${displayName}${suffix}`;
         }
     }
 
