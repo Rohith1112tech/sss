@@ -580,7 +580,7 @@ async function renderDashboard() {
         tbody.innerHTML = '';
     }
     
-    const sortedTimings = [...state.timings].sort((a, b) => a.start_time.localeCompare(b.start_time));
+    const sortedTimings = [...state.timings].sort((a, b) => parseTimeToMinutes(a.start_time) - parseTimeToMinutes(b.start_time));
     
     // Update substitutions table headers with custom slot names dynamically!
     const theadRow = document.getElementById('substitutions-thead-row');
@@ -1593,4 +1593,16 @@ function getPeriodNumberFromName(name) {
     const norm = name.trim().toLowerCase();
     const match = norm.match(/(?:period|p)\s*(\d+)/i) || norm.match(/(\d+)/);
     return match ? parseInt(match[1], 10) : -1;
+}
+
+function parseTimeToMinutes(timeStr) {
+    if (!timeStr) return 0;
+    const parts = timeStr.split(':');
+    let hours = parseInt(parts[0] || '0', 10);
+    const minutes = parseInt(parts[1] || '0', 10);
+    // If it's a school schedule, hours between 1 and 7 are PM (add 12 hours)
+    if (hours >= 1 && hours < 8) {
+        hours += 12;
+    }
+    return hours * 60 + minutes;
 }
