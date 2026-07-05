@@ -598,11 +598,23 @@
             <!-- Populated dynamically with checkboxes -->
           </div>
         </div>
+        <div class="form-group" id="subject-classes-mapping-group" style="margin-bottom: 12px; display: none;">
+          <label>Classes Handled per Subject</label>
+          <div id="subject-classes-mapping-container" style="display: flex; flex-direction: column; gap: 10px; max-height: 180px; overflow-y: auto; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary);">
+            <!-- Populated dynamically when a subject is checked -->
+          </div>
+        </div>
         <div class="form-group" style="margin-bottom: 12px;">
           <label for="new-teacher-type">Teacher Type</label>
           <select id="new-teacher-type" required>
             <option value="Class Teacher">Class Teacher</option>
             <option value="Non Class Teacher">Non Class Teacher</option>
+          </select>
+        </div>
+        <div class="form-group" id="class-teacher-class-group" style="margin-bottom: 12px; display: none;">
+          <label for="new-teacher-class">Class Teacher of Class</label>
+          <select id="new-teacher-class" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 10px; border-radius: 6px; width: 100%;">
+            <!-- Populated dynamically with classes from state.classes -->
           </select>
         </div>
         <div class="form-group" style="margin-bottom: 16px;">

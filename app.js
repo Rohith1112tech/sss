@@ -268,6 +268,14 @@ function initUI() {
     // Teacher Registry Modal triggers
     document.getElementById('open-add-teacher-modal-btn').addEventListener('click', () => {
         cancelTeacherEdit();
+        populateClassDropdowns();
+        // By default, type select is set to Class Teacher. Trigger the display of class teacher class selection.
+        const typeSelect = document.getElementById('new-teacher-type');
+        if (typeSelect) {
+            typeSelect.value = 'Class Teacher';
+            document.getElementById('class-teacher-class-group').style.display = 'block';
+            document.getElementById('new-teacher-class').required = true;
+        }
         document.getElementById('teacher-modal').style.display = 'flex';
     });
 
@@ -279,6 +287,33 @@ function initUI() {
         cancelTeacherEdit();
         document.getElementById('teacher-modal').style.display = 'none';
     });
+
+    // Handle Teacher Type changes
+    const teacherTypeSelect = document.getElementById('new-teacher-type');
+    if (teacherTypeSelect) {
+        teacherTypeSelect.addEventListener('change', () => {
+            const val = teacherTypeSelect.value;
+            const classGroup = document.getElementById('class-teacher-class-group');
+            if (val === 'Class Teacher') {
+                classGroup.style.display = 'block';
+                document.getElementById('new-teacher-class').required = true;
+            } else {
+                classGroup.style.display = 'none';
+                document.getElementById('new-teacher-class').required = false;
+                document.getElementById('new-teacher-class').value = '';
+            }
+        });
+    }
+
+    // Handle Subject selections to dynamically render classes mapping
+    const subjectsGroup = document.getElementById('subjects-checkbox-group');
+    if (subjectsGroup) {
+        subjectsGroup.addEventListener('change', (e) => {
+            if (e.target.classList.contains('subject-checkbox')) {
+                renderSubjectClassesMappingUI();
+            }
+        });
+    }
 
     // Teacher Registry Form
     const teacherForm = document.getElementById('add-teacher-form');
@@ -298,6 +333,20 @@ function initUI() {
             alert('A teacher with this name already exists.');
             return;
         }
+
+        // Build subject-class mapping
+        const subjectClassesMapping = {};
+        document.querySelectorAll('.subject-class-mapping-item').forEach(item => {
+            const subjectKey = item.dataset.subject;
+            const checkedClasses = Array.from(item.querySelectorAll('.class-check:checked')).map(el => el.value);
+            if (checkedClasses.length > 0) {
+                subjectClassesMapping[subjectKey] = checkedClasses;
+            }
+        });
+        const subjectClassesJSON = JSON.stringify(subjectClassesMapping);
+
+        // Get class teacher's class
+        const teacherClass = type === 'Class Teacher' ? document.getElementById('new-teacher-class').value : null;
         
         await fetch(`${API_BASE}/teachers`, {
             method: 'POST',
@@ -307,6 +356,8 @@ function initUI() {
                 Main_Subject: subject,
                 Max_Periods_Per_Day: max,
                 Teacher_Type: type,
+                Class_Name: teacherClass,
+                Subject_Classes: subjectClassesJSON,
                 isEdit: isEdit
             })
         });
@@ -449,6 +500,7 @@ function initUI() {
     renderTimetableTab();
     renderTeachersTab();
     populateSubjectDropdowns();
+    populateClassDropdowns();
     renderClassesTab();
     renderSubjectsTab();
     renderTimingsEditor();
@@ -851,13 +903,25 @@ function renderTeachersTab() {
         const safeName = t.Teacher_Name.replace(/'/g, "\\'");
         const safeSubject = t.Main_Subject.replace(/'/g, "\\'");
         const safeType = (t.Teacher_Type || 'Class Teacher').replace(/'/g, "\\'");
+        const safeClassName = (t.Class_Name || '').replace(/'/g, "\\'");
+        const safeSubClasses = (t.Subject_Classes || '{}').replace(/'/g, "\\'");
+        
+        const subClassesSummary = renderSubjectClassesSummary(t);
+        const subjectDisplay = subClassesSummary 
+            ? `${t.Main_Subject}<br><small style="color:var(--text-secondary); font-size:11px;">${subClassesSummary}</small>` 
+            : t.Main_Subject;
+        
+        const typeDisplay = (t.Teacher_Type === 'Class Teacher' && t.Class_Name) 
+            ? `Class Teacher (${t.Class_Name})` 
+            : (t.Teacher_Type || 'Class Teacher');
+        
         tr.innerHTML = `
             <td><strong>${t.Teacher_Name}</strong></td>
-            <td>${t.Main_Subject}</td>
-            <td>${t.Teacher_Type || 'Class Teacher'}</td>
+            <td>${subjectDisplay}</td>
+            <td>${typeDisplay}</td>
             <td>${t.Max_Periods_Per_Day}</td>
             <td>
-                <button class="btn btn-primary" style="padding:6px 12px; font-size:12px; margin-right:6px;" onclick="editTeacher('${safeName}', '${safeSubject}', '${safeType}', ${t.Max_Periods_Per_Day})">Edit</button>
+                <button class="btn btn-primary" style="padding:6px 12px; font-size:12px; margin-right:6px;" onclick="editTeacher('${safeName}', '${safeSubject}', '${safeType}', ${t.Max_Periods_Per_Day}, '${safeClassName}', '${safeSubClasses}')">Edit</button>
                 <button class="btn btn-danger" style="padding:6px 12px; font-size:12px;" onclick="deleteTeacher('${safeName}')">Delete</button>
             </td>
         `;
@@ -1163,7 +1227,138 @@ function populateSubjectDropdowns() {
     });
 }
 
-function editTeacher(name, subject, type, max) {
+function populateClassDropdowns() {
+    const clsSelect = document.getElementById('new-teacher-class');
+    if (!clsSelect) return;
+    
+    const currentVal = clsSelect.value;
+    clsSelect.innerHTML = '<option value="">-- Select Class --</option>';
+    if (state.classes) {
+        state.classes.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c;
+            clsSelect.appendChild(opt);
+        });
+    }
+    if ([...clsSelect.options].some(o => o.value === currentVal)) {
+        clsSelect.value = currentVal;
+    }
+}
+
+function renderSubjectClassesMappingUI(existingMapping = {}) {
+    const checkedSubjects = Array.from(document.querySelectorAll('.subject-checkbox:checked')).map(el => el.value);
+    const group = document.getElementById('subject-classes-mapping-group');
+    const container = document.getElementById('subject-classes-mapping-container');
+    if (!group || !container) return;
+    
+    if (checkedSubjects.length === 0) {
+        group.style.display = 'none';
+        container.innerHTML = '';
+        return;
+    }
+    
+    group.style.display = 'block';
+    
+    // Save current user selection from DOM first
+    const currentSelection = {};
+    document.querySelectorAll('.subject-class-mapping-item').forEach(item => {
+        const subject = item.dataset.subject;
+        const checked = Array.from(item.querySelectorAll('.class-check:checked')).map(el => el.value);
+        currentSelection[subject] = checked;
+    });
+    
+    // Merge existing mapping (if any, like from editTeacher call)
+    const mergedMapping = { ...currentSelection, ...existingMapping };
+    
+    container.innerHTML = '';
+    
+    checkedSubjects.forEach(subject => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'subject-class-mapping-item';
+        itemDiv.dataset.subject = subject;
+        itemDiv.style.border = '1px solid var(--border-color)';
+        itemDiv.style.borderRadius = '6px';
+        itemDiv.style.padding = '8px 12px';
+        itemDiv.style.background = 'var(--bg-secondary)';
+        itemDiv.style.marginBottom = '8px';
+        
+        const title = document.createElement('div');
+        title.style.fontWeight = '600';
+        title.style.fontSize = '13px';
+        title.style.marginBottom = '6px';
+        title.style.color = 'var(--primary-color)';
+        title.textContent = `Classes for ${subject}:`;
+        itemDiv.appendChild(title);
+        
+        const classesList = document.createElement('div');
+        classesList.className = 'classes-checkbox-list';
+        classesList.style.display = 'flex';
+        classesList.style.flexWrap = 'wrap';
+        classesList.style.gap = '8px';
+        
+        if (state.classes && state.classes.length > 0) {
+            state.classes.forEach(cls => {
+                const classDiv = document.createElement('div');
+                classDiv.style.display = 'flex';
+                classDiv.style.alignItems = 'center';
+                classDiv.style.gap = '4px';
+                classDiv.style.fontSize = '12px';
+                
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = cls;
+                cb.className = 'class-check';
+                cb.style.cursor = 'pointer';
+                
+                const safeSub = subject.replace(/\s+/g, '-');
+                const safeCls = cls.replace(/\s+/g, '-');
+                cb.id = `class-cb-${safeSub}-${safeCls}`;
+                
+                if (mergedMapping[subject] && mergedMapping[subject].includes(cls)) {
+                    cb.checked = true;
+                }
+                
+                const lbl = document.createElement('label');
+                lbl.textContent = cls;
+                lbl.style.cursor = 'pointer';
+                lbl.htmlFor = cb.id;
+                
+                classDiv.appendChild(cb);
+                classDiv.appendChild(lbl);
+                classesList.appendChild(classDiv);
+            });
+        } else {
+            const noCls = document.createElement('div');
+            noCls.style.fontSize = '11px';
+            noCls.style.color = 'var(--text-secondary)';
+            noCls.textContent = 'No classes registered. Register classes first.';
+            classesList.appendChild(noCls);
+        }
+        
+        itemDiv.appendChild(classesList);
+        container.appendChild(itemDiv);
+    });
+}
+
+function renderSubjectClassesSummary(t) {
+    if (!t.Subject_Classes) return '';
+    try {
+        const mapping = typeof t.Subject_Classes === 'string' ? JSON.parse(t.Subject_Classes) : t.Subject_Classes;
+        const parts = [];
+        for (const [subject, classes] of Object.entries(mapping)) {
+            if (classes && classes.length > 0) {
+                parts.push(`${subject}: [${classes.join(', ')}]`);
+            }
+        }
+        return parts.join(' | ');
+    } catch (e) {
+        console.error("Error parsing subject classes mapping:", e);
+        return '';
+    }
+}
+
+function editTeacher(name, subject, type, max, className = '', subjectClasses = '') {
     document.getElementById('teacher-edit-mode').value = 'true';
     document.getElementById('new-teacher-name').value = name;
     document.getElementById('new-teacher-name').readOnly = true;
@@ -1175,6 +1370,29 @@ function editTeacher(name, subject, type, max) {
     document.querySelectorAll('.subject-checkbox').forEach(input => {
         input.checked = handled.includes(input.value.trim().toLowerCase());
     });
+    
+    // Toggle Class Teacher fields
+    const classGroup = document.getElementById('class-teacher-class-group');
+    if (type === 'Class Teacher') {
+        classGroup.style.display = 'block';
+        document.getElementById('new-teacher-class').required = true;
+        document.getElementById('new-teacher-class').value = className || '';
+    } else {
+        classGroup.style.display = 'none';
+        document.getElementById('new-teacher-class').required = false;
+        document.getElementById('new-teacher-class').value = '';
+    }
+    
+    // Parse mapping
+    let mappingObj = {};
+    try {
+        if (subjectClasses) {
+            mappingObj = typeof subjectClasses === 'string' ? JSON.parse(subjectClasses) : subjectClasses;
+        }
+    } catch (e) {
+        console.error("Error parsing subjectClasses:", e);
+    }
+    renderSubjectClassesMappingUI(mappingObj);
     
     document.getElementById('teacher-form-title').textContent = 'Edit Teacher Details';
     document.getElementById('teacher-submit-btn').textContent = 'Update Teacher';
@@ -1191,6 +1409,20 @@ function cancelTeacherEdit() {
     document.querySelectorAll('.subject-checkbox').forEach(input => {
         input.checked = false;
     });
+    
+    // Reset newly added elements
+    const classGroup = document.getElementById('class-teacher-class-group');
+    if (classGroup) classGroup.style.display = 'none';
+    const clsSelect = document.getElementById('new-teacher-class');
+    if (clsSelect) {
+        clsSelect.required = false;
+        clsSelect.value = '';
+    }
+    
+    const mappingGroup = document.getElementById('subject-classes-mapping-group');
+    if (mappingGroup) mappingGroup.style.display = 'none';
+    const mappingContainer = document.getElementById('subject-classes-mapping-container');
+    if (mappingContainer) mappingContainer.innerHTML = '';
     
     document.getElementById('add-teacher-form').reset();
     
@@ -1403,6 +1635,7 @@ function updateAllDropdowns() {
     populateTimetableFilters();
     renderExceptTab();
     populateAbsencePeriodsCheckboxes();
+    populateClassDropdowns();
 }
 
 function populateTimetableFilters() {

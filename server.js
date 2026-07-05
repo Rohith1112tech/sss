@@ -1949,13 +1949,15 @@ async function initDatabase() {
             main_subject VARCHAR(100),
             max_periods_per_day INT DEFAULT 25,
             class_name VARCHAR(50),
-            teacher_type VARCHAR(50) DEFAULT 'Class Teacher'
+            teacher_type VARCHAR(50) DEFAULT 'Class Teacher',
+            subject_classes TEXT
         )
     `);
     
     // Migrations for existing databases
     await pool.query("ALTER TABLE teachers ADD COLUMN IF NOT EXISTS class_name VARCHAR(50)");
     await pool.query("ALTER TABLE teachers ADD COLUMN IF NOT EXISTS teacher_type VARCHAR(50) DEFAULT 'Class Teacher'");
+    await pool.query("ALTER TABLE teachers ADD COLUMN IF NOT EXISTS subject_classes TEXT");
     await pool.query("UPDATE teachers SET max_periods_per_day = 25 WHERE max_periods_per_day <= 8");
     
     await pool.query(`
@@ -2173,7 +2175,8 @@ app.get('/api/state', async (req, res) => {
             Main_Subject: r.main_subject,
             Max_Periods_Per_Day: String(r.max_periods_per_day),
             Class_Name: r.class_name,
-            Teacher_Type: r.teacher_type
+            Teacher_Type: r.teacher_type,
+            Subject_Classes: r.subject_classes
         }));
         
         const timetableData = timetableRes.rows.map(r => ({
@@ -2325,17 +2328,17 @@ app.delete('/api/absentees', async (req, res) => {
 
 // Add teacher to registry
 app.post('/api/teachers', async (req, res) => {
-    const { Teacher_Name, Main_Subject, Max_Periods_Per_Day, Class_Name, Teacher_Type, isEdit } = req.body;
+    const { Teacher_Name, Main_Subject, Max_Periods_Per_Day, Class_Name, Teacher_Type, Subject_Classes, isEdit } = req.body;
     try {
         if (isEdit) {
             await pool.query(
-                "UPDATE teachers SET main_subject = $1, max_periods_per_day = $2, class_name = $3, teacher_type = $4 WHERE teacher_name = $5",
-                [Main_Subject, parseInt(Max_Periods_Per_Day, 10), Class_Name, Teacher_Type, Teacher_Name]
+                "UPDATE teachers SET main_subject = $1, max_periods_per_day = $2, class_name = $3, teacher_type = $4, subject_classes = $5 WHERE teacher_name = $6",
+                [Main_Subject, parseInt(Max_Periods_Per_Day, 10), Class_Name, Teacher_Type, Subject_Classes, Teacher_Name]
             );
         } else {
             await pool.query(
-                "INSERT INTO teachers (teacher_name, main_subject, max_periods_per_day, class_name, teacher_type) VALUES ($1, $2, $3, $4, $5)",
-                [Teacher_Name, Main_Subject, parseInt(Max_Periods_Per_Day, 10), Class_Name, Teacher_Type]
+                "INSERT INTO teachers (teacher_name, main_subject, max_periods_per_day, class_name, teacher_type, subject_classes) VALUES ($1, $2, $3, $4, $5, $6)",
+                [Teacher_Name, Main_Subject, parseInt(Max_Periods_Per_Day, 10), Class_Name, Teacher_Type, Subject_Classes]
             );
         }
         res.json({ success: true });
