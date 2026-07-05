@@ -648,9 +648,12 @@ tr:last-child td {
   border-radius: 12px;
   width: 90%;
   max-width: 480px;
+  max-height: 95vh;
   padding: 24px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
   animation: modalFadeIn 0.25s ease;
+  display: flex;
+  flex-direction: column;
 }
 
 @keyframes modalFadeIn {
