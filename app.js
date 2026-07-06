@@ -1965,11 +1965,13 @@ function renderCorridorDutyTab() {
     // Populate Duty Teacher dropdown
     const globalTeacherSelect = document.getElementById('global-corridor-teacher-select');
     const eligibleDutyTeachers = state.teachers.filter(t => 
-        t.Teacher_Type === 'Non Class Teacher'
+        t.Teacher_Type === 'Non Class Teacher' || 
+        !t.Class_Name || 
+        t.Class_Name.trim() === ''
     );
     
     if (globalTeacherSelect) {
-        globalTeacherSelect.innerHTML = '<option value="">-- Select Non Class Teacher --</option>';
+        globalTeacherSelect.innerHTML = '<option value="">-- Select Duty Teacher --</option>';
         eligibleDutyTeachers.forEach(dt => {
             globalTeacherSelect.innerHTML += `<option value="${dt.Teacher_Name}">${dt.Teacher_Name}</option>`;
         });
