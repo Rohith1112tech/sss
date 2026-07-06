@@ -16,7 +16,8 @@ let state = {
     subLog: [],
     classes: [],
     timings: [],
-    exceptions: []
+    exceptions: [],
+    odList: []
 };
 
 // Fetch latest database state
@@ -754,6 +755,9 @@ async function renderDashboard() {
         tr.innerHTML = html;
         tbody.appendChild(tr);
     });
+    
+    // Render the On Duty and Corridor Duty cards
+    renderODDashboardCards();
 }
 
 function findClassForTeacherPeriod(teacherName, dayName, p) {
@@ -1854,21 +1858,13 @@ async function loadSettingsTab() {
             document.getElementById('settings-teacher-username').value = teacherUser.username;
             document.getElementById('settings-teacher-password').value = teacherUser.password;
         }
-        renderODSection();
     } catch (err) {
         console.error("Failed to load settings:", err);
     }
 }
 
-function renderODSection() {
-    const filterDateInput = document.getElementById('od-filter-date');
-    if (!filterDateInput) return;
-    
-    // Set default date if empty
-    if (!filterDateInput.value) {
-        filterDateInput.value = new Date().toISOString().split('T')[0];
-    }
-    const selectedDate = filterDateInput.value;
+function renderODDashboardCards() {
+    const selectedDate = document.getElementById('selected-date').value;
     
     // Populate the OD teacher select dropdown (all teachers)
     const odTeacherSelect = document.getElementById('od-teacher-select');
@@ -1879,65 +1875,98 @@ function renderODSection() {
         });
     }
     
-    const tbody = document.getElementById('od-tbody');
-    if (!tbody) return;
-    tbody.innerHTML = '';
+    const isTeacherRole = localStorage.getItem('user_role') === 'Teacher';
     
-    // Filter OD records for the selected date
-    const dailyODList = (state.odList || []).filter(item => item.Date === selectedDate);
-    
-    // Find all eligible Non Class Teachers for corridor duty on this date
-    // Non Class Teachers who are NOT absent and NOT on OD
-    const absentNames = state.absentees.filter(a => a.Date === selectedDate && a.Status === 'Absent').map(a => a.Teacher_Name);
-    const odNamesForDate = dailyODList.map(item => item.Teacher_Name);
-    
-    const eligibleDutyTeachers = state.teachers.filter(t => 
-        t.Teacher_Type === 'Non Class Teacher' && 
-        !absentNames.includes(t.Teacher_Name) && 
-        !odNamesForDate.includes(t.Teacher_Name)
-    );
-    
-    if (dailyODList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-secondary); padding: 20px;">No teachers on OD for this date.</td></tr>';
-        return;
+    // Hide the Log On Duty form if Teacher role
+    const odLoggingCard = document.getElementById('od-logging-card');
+    if (odLoggingCard) {
+        const addForm = document.getElementById('add-od-form');
+        if (addForm) {
+            addForm.style.display = isTeacherRole ? 'none' : 'flex';
+        }
     }
     
-    dailyODList.forEach(item => {
-        const tr = document.createElement('tr');
+    // 1. Populate the On Duty (OD) Table
+    const odTbody = document.getElementById('od-tbody');
+    if (odTbody) {
+        odTbody.innerHTML = '';
+        const dailyODList = (state.odList || []).filter(item => item.Date === selectedDate);
         
-        // Generate options for Corridor Duty select
-        let dutyOptionsHTML = '<option value="">-- Assign Corridor Duty --</option>';
-        eligibleDutyTeachers.forEach(dt => {
-            const selectedAttr = dt.Teacher_Name === item.Corridor_Duty_Teacher ? 'selected' : '';
-            dutyOptionsHTML += `<option value="${dt.Teacher_Name}" ${selectedAttr}>${dt.Teacher_Name}</option>`;
-        });
-        
-        // If the current corridor duty teacher is not in the eligible list (e.g. they were assigned but are now absent/OD, or we just want to ensure they show up in option)
-        if (item.Corridor_Duty_Teacher && !eligibleDutyTeachers.some(dt => dt.Teacher_Name === item.Corridor_Duty_Teacher)) {
-            dutyOptionsHTML += `<option value="${item.Corridor_Duty_Teacher}" selected>${item.Corridor_Duty_Teacher}</option>`;
+        if (dailyODList.length === 0) {
+            odTbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--text-secondary); padding: 12px;">No teachers on OD.</td></tr>';
+        } else {
+            dailyODList.forEach(item => {
+                const tr = document.createElement('tr');
+                const actionBtnHTML = isTeacherRole ? '' : `
+                    <button class="btn btn-secondary btn-sm" onclick="removeOD('${item.id}')" style="padding: 4px 8px; font-size: 12px; color: var(--text-danger); border-color: var(--text-danger); background: none; cursor: pointer; border-radius: 4px;">
+                        Remove
+                    </button>
+                `;
+                tr.innerHTML = `
+                    <td><strong>${item.Teacher_Name}</strong></td>
+                    <td>${actionBtnHTML}</td>
+                `;
+                odTbody.appendChild(tr);
+            });
         }
+    }
+    
+    // 2. Populate the Corridor Duty Table
+    const corridorTbody = document.getElementById('corridor-duty-tbody');
+    if (corridorTbody) {
+        corridorTbody.innerHTML = '';
+        const dailyODList = (state.odList || []).filter(item => item.Date === selectedDate);
         
-        tr.innerHTML = `
-            <td><strong>${item.Teacher_Name}</strong></td>
-            <td>
-                <select onchange="assignCorridorDuty('${selectedDate}', '${item.Teacher_Name}', this.value)" style="border: 1px solid var(--border-color); border-radius: 4px; padding: 6px 12px; width: 220px; background: var(--bg-tertiary); color: var(--text-primary); cursor: pointer; outline: none;">
-                    ${dutyOptionsHTML}
-                </select>
-            </td>
-            <td>
-                <button class="btn btn-secondary btn-sm" onclick="removeOD('${item.id}')" style="padding: 6px 12px; font-size: 12px; color: var(--text-danger); border-color: var(--text-danger); background: none; cursor: pointer; border-radius: 4px;">
-                    Remove
-                </button>
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
+        const absentNames = state.absentees.filter(a => a.Date === selectedDate && a.Status === 'Absent').map(a => a.Teacher_Name);
+        const odNamesForDate = dailyODList.map(item => item.Teacher_Name);
+        
+        const eligibleDutyTeachers = state.teachers.filter(t => 
+            t.Teacher_Type === 'Non Class Teacher' && 
+            !absentNames.includes(t.Teacher_Name) && 
+            !odNamesForDate.includes(t.Teacher_Name)
+        );
+        
+        if (dailyODList.length === 0) {
+            corridorTbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--text-secondary); padding: 12px;">No teachers on OD.</td></tr>';
+        } else {
+            dailyODList.forEach(item => {
+                const tr = document.createElement('tr');
+                
+                let selectHTML = '';
+                if (isTeacherRole) {
+                    selectHTML = `<strong>${item.Corridor_Duty_Teacher || 'Not Assigned'}</strong>`;
+                } else {
+                    let dutyOptionsHTML = '<option value="">-- Assign Corridor Duty --</option>';
+                    eligibleDutyTeachers.forEach(dt => {
+                        const selectedAttr = dt.Teacher_Name === item.Corridor_Duty_Teacher ? 'selected' : '';
+                        dutyOptionsHTML += `<option value="${dt.Teacher_Name}" ${selectedAttr}>${dt.Teacher_Name}</option>`;
+                    });
+                    
+                    if (item.Corridor_Duty_Teacher && !eligibleDutyTeachers.some(dt => dt.Teacher_Name === item.Corridor_Duty_Teacher)) {
+                        dutyOptionsHTML += `<option value="${item.Corridor_Duty_Teacher}" selected>${item.Corridor_Duty_Teacher}</option>`;
+                    }
+                    
+                    selectHTML = `
+                        <select onchange="assignCorridorDuty('${selectedDate}', '${item.Teacher_Name}', this.value)" style="border: 1px solid var(--border-color); border-radius: 4px; padding: 6px 12px; width: 220px; background: var(--bg-tertiary); color: var(--text-primary); cursor: pointer; outline: none; font-size: 13px;">
+                            ${dutyOptionsHTML}
+                        </select>
+                    `;
+                }
+                
+                tr.innerHTML = `
+                    <td><strong>${item.Teacher_Name}</strong></td>
+                    <td>${selectHTML}</td>
+                `;
+                corridorTbody.appendChild(tr);
+            });
+        }
+    }
 }
 
 async function handleAddOD(e) {
     e.preventDefault();
     const teacher = document.getElementById('od-teacher-select').value;
-    const date = document.getElementById('od-filter-date').value;
+    const date = document.getElementById('selected-date').value;
     if (!teacher || !date) return;
     
     await fetch(`${API_BASE}/od`, {
@@ -1947,7 +1976,7 @@ async function handleAddOD(e) {
     });
     
     await fetchState();
-    renderODSection();
+    renderDashboard();
 }
 
 async function removeOD(id) {
@@ -1955,7 +1984,7 @@ async function removeOD(id) {
         method: 'DELETE'
     });
     await fetchState();
-    renderODSection();
+    renderDashboard();
 }
 
 async function assignCorridorDuty(date, teacher, dutyTeacher) {
@@ -1969,7 +1998,7 @@ async function assignCorridorDuty(date, teacher, dutyTeacher) {
         })
     });
     await fetchState();
-    renderODSection();
+    renderDashboard();
 }
 
 function getSupervisionIndexFromName(name) {

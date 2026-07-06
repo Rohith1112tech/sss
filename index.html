@@ -260,6 +260,62 @@
           </div>
         </div>
 
+        <!-- On Duty (OD) Logging Card -->
+        <div class="card" id="od-logging-card">
+          <div class="card-header">
+            <h2>Log Teacher On Duty (OD)</h2>
+          </div>
+          <div class="card-body">
+            <!-- Add OD Teacher Form -->
+            <form id="add-od-form" style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label for="od-teacher-select">Select Teacher</label>
+                <select id="od-teacher-select" required style="width:100%; padding:8px; border-radius:6px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); height: 38px;">
+                  <!-- Populated dynamically -->
+                </select>
+              </div>
+              <button type="submit" class="btn btn-primary" style="width:100%; height:38px;">+ Add to OD</button>
+            </form>
+            
+            <!-- OD List Table -->
+            <div class="table-wrapper">
+              <table style="width:100%; border-collapse:collapse; text-align:center; font-size:13px;">
+                <thead>
+                  <tr>
+                    <th>Teacher Name</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="od-tbody">
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Corridor Duty Assignment Card -->
+        <div class="card" id="corridor-duty-card">
+          <div class="card-header">
+            <h2>Corridor Duty Assignment</h2>
+          </div>
+          <div class="card-body">
+            <div class="table-wrapper">
+              <table style="width:100%; border-collapse:collapse; text-align:center; font-size:13px;">
+                <thead>
+                  <tr>
+                    <th>On Duty Teacher</th>
+                    <th>Corridor Duty Teacher (Non Class Teachers Only)</th>
+                  </tr>
+                </thead>
+                <tbody id="corridor-duty-tbody">
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
       </div><!-- end dashboard-grid -->
 
     </section>
@@ -545,45 +601,6 @@
             <button type="submit" class="btn btn-primary">Update Teacher Credentials</button>
           </form>
         </div>
-        <!-- OD & Corridor Duty Management Card -->
-        <div class="card" style="grid-column: 1 / -1;">
-          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
-            <h2>On Duty (OD) & Corridor Duty Management</h2>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <label for="od-filter-date" style="font-size:13px; font-weight:500; color:var(--text-secondary); white-space:nowrap; margin-bottom:0;">Date:</label>
-              <input type="date" id="od-filter-date" onchange="renderODSection()" style="background:var(--bg-tertiary); border:1px solid var(--border-color); border-radius:6px; padding:4px 8px; color:var(--text-primary); font-size:13px; cursor:pointer;">
-            </div>
-          </div>
-          <div class="card-body" style="padding: 20px;">
-            <!-- Add OD Teacher Form -->
-            <form id="add-od-form" style="display:flex; gap:12px; align-items:flex-end; margin-bottom:20px; flex-wrap:wrap;">
-              <div class="form-group" style="margin-bottom:0; flex:1; min-width:200px;">
-                <label for="od-teacher-select" style="font-size:12px; margin-bottom:4px;">Select Teacher</label>
-                <select id="od-teacher-select" required style="width:100%; padding:8px; border-radius:6px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); height: 38px;">
-                  <!-- Populated dynamically -->
-                </select>
-              </div>
-              <button type="submit" class="btn btn-primary" style="height:38px; padding:0 20px;">+ Add to OD</button>
-            </form>
-            
-            <!-- OD List Table -->
-            <div class="table-wrapper">
-              <table style="width:100%; border-collapse:collapse; text-align:center; font-size:13px;">
-                <thead>
-                  <tr>
-                    <th>Teacher Name</th>
-                    <th>Corridor Duty Teacher (Non Class Teachers Only)</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody id="od-tbody">
-                  <!-- Populated dynamically -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
       </div>
     </section>
 
