@@ -1952,6 +1952,16 @@ function renderCorridorDutyTab() {
         corridorDatePicker.value = selectedDate;
     }
     
+    // Reset timings container to a single default input field
+    const timingsContainer = document.getElementById('corridor-timings-container');
+    if (timingsContainer) {
+        timingsContainer.innerHTML = `
+            <div class="timing-input-row" style="display:flex; gap:8px; align-items:center;">
+                <input type="text" required placeholder="e.g. Morning Break" list="corridor-timings-list" class="global-corridor-time-input" style="flex:1; height:38px; padding:8px; border-radius:6px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); outline:none;">
+            </div>
+        `;
+    }
+    
     // Populate Duty Teacher dropdown
     const globalTeacherSelect = document.getElementById('global-corridor-teacher-select');
     const dailyODList = (state.odList || []).filter(item => item.Date === selectedDate);
@@ -1981,6 +1991,31 @@ function renderCorridorDutyTab() {
     if (form && !form.dataset.listenerAttached) {
         form.addEventListener('submit', handleAssignCorridorDuty);
         form.dataset.listenerAttached = 'true';
+    }
+    
+    // Wire up Add Time button
+    const addTimeBtn = document.getElementById('add-timing-btn');
+    if (addTimeBtn && !addTimeBtn.dataset.listenerAttached) {
+        addTimeBtn.addEventListener('click', () => {
+            const container = document.getElementById('corridor-timings-container');
+            const row = document.createElement('div');
+            row.className = 'timing-input-row';
+            row.style.display = 'flex';
+            row.style.gap = '8px';
+            row.style.alignItems = 'center';
+            
+            row.innerHTML = `
+                <input type="text" required placeholder="e.g. Period 4" list="corridor-timings-list" class="global-corridor-time-input" style="flex:1; height:38px; padding:8px; border-radius:6px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); outline:none;">
+                <button type="button" class="btn btn-secondary btn-sm remove-row-btn" style="height:38px; padding:0 12px; font-size:13px; color:var(--text-danger); border-color:var(--text-danger); background:none; cursor:pointer; font-weight:bold;">✕</button>
+            `;
+            
+            row.querySelector('.remove-row-btn').addEventListener('click', () => {
+                row.remove();
+            });
+            
+            container.appendChild(row);
+        });
+        addTimeBtn.dataset.listenerAttached = 'true';
     }
     
     const tbody = document.getElementById('corridor-duty-tbody');
@@ -2014,25 +2049,43 @@ async function handleAssignCorridorDuty(e) {
     e.preventDefault();
     const date = document.getElementById('selected-date').value;
     const nameInput = document.getElementById('global-corridor-name-input').value;
-    const timeInput = document.getElementById('global-corridor-time-input').value;
+    
+    // Fetch all timings input fields
+    const timingInputs = Array.from(document.querySelectorAll('.global-corridor-time-input'));
+    const times = timingInputs.map(input => input.value.trim()).filter(v => v !== '');
+    
     const teacherSelect = document.getElementById('global-corridor-teacher-select').value;
     
-    if (!nameInput || !timeInput || !teacherSelect || !date) return;
+    if (!nameInput || times.length === 0 || !teacherSelect || !date) return;
     
-    await fetch(`${API_BASE}/corridor-duty`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            Date: date,
-            Corridor_Name: nameInput,
-            Corridor_Time: timeInput,
-            Duty_Teacher: teacherSelect
-        })
+    // Make separate fetch POST requests
+    const promises = times.map(time => {
+        return fetch(`${API_BASE}/corridor-duty`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                Date: date,
+                Corridor_Name: nameInput,
+                Corridor_Time: time,
+                Duty_Teacher: teacherSelect
+            })
+        });
     });
     
-    // Clear the inputs for subsequent additions
+    await Promise.all(promises);
+    
+    // Reset fields
     document.getElementById('global-corridor-name-input').value = '';
-    document.getElementById('global-corridor-time-input').value = '';
+    
+    // Reset timings container to a single row
+    const timingsContainer = document.getElementById('corridor-timings-container');
+    if (timingsContainer) {
+        timingsContainer.innerHTML = `
+            <div class="timing-input-row" style="display:flex; gap:8px; align-items:center;">
+                <input type="text" required placeholder="e.g. Morning Break" list="corridor-timings-list" class="global-corridor-time-input" style="flex:1; height:38px; padding:8px; border-radius:6px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); outline:none;">
+            </div>
+        `;
+    }
     
     await fetchState();
     renderCorridorDutyTab();
