@@ -219,6 +219,11 @@ function initUI() {
         });
     }
 
+    const addODForm = document.getElementById('add-od-form');
+    if (addODForm) {
+        addODForm.addEventListener('submit', handleAddOD);
+    }
+
     // Absence Form
     const absenceForm = document.getElementById('absence-form');
     absenceForm.addEventListener('submit', async (e) => {
@@ -757,6 +762,19 @@ function findClassForTeacherPeriod(teacherName, dayName, p) {
     return row ? row.Class : null;
 }
 
+function isTeacherBusyWithSupervision(name, day, period) {
+    const periodToColMap = {
+        0: 'Class_Incharge',
+        9: 'Morning_Break',
+        10: 'Lunch_Break',
+        11: 'Evening_Break',
+        12: 'Diary_Games'
+    };
+    const colName = periodToColMap[parseInt(period, 10)];
+    if (!colName) return false;
+    return state.timetable.some(row => row.Day === day && row[colName] === name);
+}
+
 function buildGridOverrideSelector(dateStr, dayName, cls, period, absentTeacher, substituteTeacher, activeSubs) {
     const isSupervision = [0, 9, 10, 11, 12].includes(parseInt(period, 10));
     let selectHTML = `<select class="sub-select" style="width:100%; min-width:120px;" onchange="overrideSubstitution('${cls}', '${period}', '${dateStr}', this.value)">`;
@@ -776,6 +794,7 @@ function buildGridOverrideSelector(dateStr, dayName, cls, period, absentTeacher,
         
         if (isSupervision) {
             if (t.Teacher_Type !== 'Non Class Teacher') return;
+            if (isTeacherBusyWithSupervision(t.Teacher_Name, dayName, period)) return;
         } else {
             const sched = getTeacherDailySchedule(t.Teacher_Name, dayName);
             if (sched[periodKey] !== 'Free') return; // busy
@@ -815,21 +834,45 @@ async function cancelAbsence(name, dateStr) {
 }
 
 function renderTimetableTab() {
-    const headers = document.querySelectorAll('#tab-timetable thead th');
-    for (let p = 1; p <= 8; p++) {
-        // Find matching timing slot based on standard naming (e.g. Period 1, P1, Period01, etc.)
-        const t = state.timings.find(item => {
-            const name = item.period_name.trim().toLowerCase();
-            return name === `period ${p}` || name === `p${p}` || name === `p0${p}` || 
-                   name.includes(`p ${p}`) || name.includes(`period${p}`) ||
-                   ((name.startsWith('p') || name.startsWith('period')) && name.includes(String(p)));
+    const columns = [
+        { name: 'Class', key: 'Class', isEditable: false },
+        { name: 'Class Incharge', key: 'Class_Incharge', isEditable: true, dbKey: 'class_incharge', searchName: 'Class Incharge' },
+        { name: 'Day', key: 'Day', isEditable: false },
+        { name: 'Period 1', key: 'Period_1', isEditable: true, dbKey: 'period_1', searchName: 'Period 1' },
+        { name: 'Period 2', key: 'Period_2', isEditable: true, dbKey: 'period_2', searchName: 'Period 2' },
+        { name: 'Morning Break', key: 'Morning_Break', isEditable: true, dbKey: 'morning_break', searchName: 'Morning Break' },
+        { name: 'Period 3', key: 'Period_3', isEditable: true, dbKey: 'period_3', searchName: 'Period 3' },
+        { name: 'Period 4', key: 'Period_4', isEditable: true, dbKey: 'period_4', searchName: 'Period 4' },
+        { name: 'Lunch Break', key: 'Lunch_Break', isEditable: true, dbKey: 'lunch_break', searchName: 'Lunch Break' },
+        { name: 'Period 5', key: 'Period_5', isEditable: true, dbKey: 'period_5', searchName: 'Period 5' },
+        { name: 'Period 6', key: 'Period_6', isEditable: true, dbKey: 'period_6', searchName: 'Period 6' },
+        { name: 'Evening Break', key: 'Evening_Break', isEditable: true, dbKey: 'evening_break', searchName: 'Evening Break' },
+        { name: 'Period 7', key: 'Period_7', isEditable: true, dbKey: 'period_7', searchName: 'Period 7' },
+        { name: 'Period 8', key: 'Period_8', isEditable: true, dbKey: 'period_8', searchName: 'Period 8' },
+        { name: 'Diary / Games', key: 'Diary_Games', isEditable: true, dbKey: 'diary_games', searchName: 'Diary / Games' }
+    ];
+
+    // Populate the headers dynamically to include times from state.timings
+    const theadRow = document.getElementById('timetable-header-row');
+    if (theadRow) {
+        theadRow.innerHTML = '';
+        columns.forEach(col => {
+            const th = document.createElement('th');
+            if (col.isEditable) {
+                // Find matching timing slot
+                const t = state.timings.find(item => {
+                    const name = item.period_name.trim().toLowerCase();
+                    const sName = col.searchName.trim().toLowerCase();
+                    return name === sName || name.replace(/\s+/g, '') === sName.replace(/\s+/g, '');
+                });
+                const displayName = t ? t.period_name : col.name;
+                const suffix = t ? ` (${t.start_time}-${t.end_time})` : '';
+                th.innerText = `${displayName}${suffix}`;
+            } else {
+                th.innerText = col.name;
+            }
+            theadRow.appendChild(th);
         });
-        
-        const displayName = t ? t.period_name : `P${p}`;
-        const suffix = t ? ` (${t.start_time}-${t.end_time})` : '';
-        if (headers[p + 1]) {
-            headers[p + 1].innerText = `${displayName}${suffix}`;
-        }
     }
 
     const classFilterVal = document.getElementById('filter-class')?.value || 'All';
@@ -840,7 +883,9 @@ function renderTimetableTab() {
     
     const filteredRows = state.timetable.filter(row => {
         const matchesClass = (classFilterVal === 'All' || row.Class === classFilterVal);
-        const matchesTeacher = (teacherFilterVal === 'All' || [1,2,3,4,5,6,7,8].some(p => row[`Period_${p}`] === teacherFilterVal));
+        const matchesTeacher = (teacherFilterVal === 'All' || 
+            columns.some(col => col.isEditable && row[col.key] === teacherFilterVal)
+        );
         return matchesClass && matchesTeacher;
     });
     
@@ -849,41 +894,43 @@ function renderTimetableTab() {
         teacherOptionsHTML += `<option value="${t.Teacher_Name}">${t.Teacher_Name}</option>`;
     });
     
-    filteredRows.forEach((row, rowIndex) => {
+    filteredRows.forEach((row) => {
         const tr = document.createElement('tr');
         
-        let periodsCellsHTML = '';
-        for (let p = 1; p <= 8; p++) {
-            const key = `Period_${p}`;
-            const val = row[key] || 'Free';
-            
-            periodsCellsHTML += `
-                <td>
-                    <select class="timetable-cell-select" onchange="updateTimetableCell('${row.Class}', '${row.Day}', ${p}, this.value)">
-                        <option value="${val}" selected>${val}</option>
-                        ${teacherOptionsHTML}
-                    </select>
-                </td>
-            `;
-        }
+        let rowHTML = '';
+        columns.forEach(col => {
+            if (col.isEditable) {
+                const val = row[col.key] || 'Free';
+                rowHTML += `
+                    <td>
+                        <select class="timetable-cell-select" onchange="updateTimetableCell('${row.Class}', '${row.Day}', '${col.dbKey}', this.value)">
+                            <option value="${val}" selected>${val}</option>
+                            ${teacherOptionsHTML}
+                        </select>
+                    </td>
+                `;
+            } else {
+                if (col.key === 'Class') {
+                    rowHTML += `<td><strong>${row[col.key]}</strong></td>`;
+                } else {
+                    rowHTML += `<td>${row[col.key]}</td>`;
+                }
+            }
+        });
         
-        tr.innerHTML = `
-            <td><strong>${row.Class}</strong></td>
-            <td>${row.Day}</td>
-            ${periodsCellsHTML}
-        `;
+        tr.innerHTML = rowHTML;
         tbody.appendChild(tr);
     });
 }
 
-async function updateTimetableCell(cls, day, period, value) {
+async function updateTimetableCell(cls, day, colKey, value) {
     await fetch(`${API_BASE}/timetable/cell`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             Class: cls,
             Day: day,
-            Period: period,
+            Period: colKey,
             Value: value
         })
     });
@@ -1807,9 +1854,122 @@ async function loadSettingsTab() {
             document.getElementById('settings-teacher-username').value = teacherUser.username;
             document.getElementById('settings-teacher-password').value = teacherUser.password;
         }
+        renderODSection();
     } catch (err) {
         console.error("Failed to load settings:", err);
     }
+}
+
+function renderODSection() {
+    const filterDateInput = document.getElementById('od-filter-date');
+    if (!filterDateInput) return;
+    
+    // Set default date if empty
+    if (!filterDateInput.value) {
+        filterDateInput.value = new Date().toISOString().split('T')[0];
+    }
+    const selectedDate = filterDateInput.value;
+    
+    // Populate the OD teacher select dropdown (all teachers)
+    const odTeacherSelect = document.getElementById('od-teacher-select');
+    if (odTeacherSelect) {
+        odTeacherSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
+        state.teachers.forEach(t => {
+            odTeacherSelect.innerHTML += `<option value="${t.Teacher_Name}">${t.Teacher_Name}</option>`;
+        });
+    }
+    
+    const tbody = document.getElementById('od-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    
+    // Filter OD records for the selected date
+    const dailyODList = (state.odList || []).filter(item => item.Date === selectedDate);
+    
+    // Find all eligible Non Class Teachers for corridor duty on this date
+    // Non Class Teachers who are NOT absent and NOT on OD
+    const absentNames = state.absentees.filter(a => a.Date === selectedDate && a.Status === 'Absent').map(a => a.Teacher_Name);
+    const odNamesForDate = dailyODList.map(item => item.Teacher_Name);
+    
+    const eligibleDutyTeachers = state.teachers.filter(t => 
+        t.Teacher_Type === 'Non Class Teacher' && 
+        !absentNames.includes(t.Teacher_Name) && 
+        !odNamesForDate.includes(t.Teacher_Name)
+    );
+    
+    if (dailyODList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-secondary); padding: 20px;">No teachers on OD for this date.</td></tr>';
+        return;
+    }
+    
+    dailyODList.forEach(item => {
+        const tr = document.createElement('tr');
+        
+        // Generate options for Corridor Duty select
+        let dutyOptionsHTML = '<option value="">-- Assign Corridor Duty --</option>';
+        eligibleDutyTeachers.forEach(dt => {
+            const selectedAttr = dt.Teacher_Name === item.Corridor_Duty_Teacher ? 'selected' : '';
+            dutyOptionsHTML += `<option value="${dt.Teacher_Name}" ${selectedAttr}>${dt.Teacher_Name}</option>`;
+        });
+        
+        // If the current corridor duty teacher is not in the eligible list (e.g. they were assigned but are now absent/OD, or we just want to ensure they show up in option)
+        if (item.Corridor_Duty_Teacher && !eligibleDutyTeachers.some(dt => dt.Teacher_Name === item.Corridor_Duty_Teacher)) {
+            dutyOptionsHTML += `<option value="${item.Corridor_Duty_Teacher}" selected>${item.Corridor_Duty_Teacher}</option>`;
+        }
+        
+        tr.innerHTML = `
+            <td><strong>${item.Teacher_Name}</strong></td>
+            <td>
+                <select onchange="assignCorridorDuty('${selectedDate}', '${item.Teacher_Name}', this.value)" style="border: 1px solid var(--border-color); border-radius: 4px; padding: 6px 12px; width: 220px; background: var(--bg-tertiary); color: var(--text-primary); cursor: pointer; outline: none;">
+                    ${dutyOptionsHTML}
+                </select>
+            </td>
+            <td>
+                <button class="btn btn-secondary btn-sm" onclick="removeOD('${item.id}')" style="padding: 6px 12px; font-size: 12px; color: var(--text-danger); border-color: var(--text-danger); background: none; cursor: pointer; border-radius: 4px;">
+                    Remove
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+async function handleAddOD(e) {
+    e.preventDefault();
+    const teacher = document.getElementById('od-teacher-select').value;
+    const date = document.getElementById('od-filter-date').value;
+    if (!teacher || !date) return;
+    
+    await fetch(`${API_BASE}/od`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Date: date, Teacher_Name: teacher })
+    });
+    
+    await fetchState();
+    renderODSection();
+}
+
+async function removeOD(id) {
+    await fetch(`${API_BASE}/od?id=${id}`, {
+        method: 'DELETE'
+    });
+    await fetchState();
+    renderODSection();
+}
+
+async function assignCorridorDuty(date, teacher, dutyTeacher) {
+    await fetch(`${API_BASE}/od/corridor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            Date: date,
+            Teacher_Name: teacher,
+            Corridor_Duty_Teacher: dutyTeacher
+        })
+    });
+    await fetchState();
+    renderODSection();
 }
 
 function getSupervisionIndexFromName(name) {

@@ -1964,17 +1964,29 @@ async function initDatabase() {
         CREATE TABLE IF NOT EXISTS timetable (
             class_name VARCHAR(50),
             day_name VARCHAR(50),
+            class_incharge VARCHAR(100) DEFAULT 'Free',
             period_1 VARCHAR(100) DEFAULT 'Free',
             period_2 VARCHAR(100) DEFAULT 'Free',
+            morning_break VARCHAR(100) DEFAULT 'Free',
             period_3 VARCHAR(100) DEFAULT 'Free',
             period_4 VARCHAR(100) DEFAULT 'Free',
+            lunch_break VARCHAR(100) DEFAULT 'Free',
             period_5 VARCHAR(100) DEFAULT 'Free',
             period_6 VARCHAR(100) DEFAULT 'Free',
+            evening_break VARCHAR(100) DEFAULT 'Free',
             period_7 VARCHAR(100) DEFAULT 'Free',
             period_8 VARCHAR(100) DEFAULT 'Free',
+            diary_games VARCHAR(100) DEFAULT 'Free',
             PRIMARY KEY (class_name, day_name)
         )
     `);
+    
+    // Migrations for existing databases (timetable columns)
+    await pool.query("ALTER TABLE timetable ADD COLUMN IF NOT EXISTS class_incharge VARCHAR(100) DEFAULT 'Free'");
+    await pool.query("ALTER TABLE timetable ADD COLUMN IF NOT EXISTS morning_break VARCHAR(100) DEFAULT 'Free'");
+    await pool.query("ALTER TABLE timetable ADD COLUMN IF NOT EXISTS lunch_break VARCHAR(100) DEFAULT 'Free'");
+    await pool.query("ALTER TABLE timetable ADD COLUMN IF NOT EXISTS evening_break VARCHAR(100) DEFAULT 'Free'");
+    await pool.query("ALTER TABLE timetable ADD COLUMN IF NOT EXISTS diary_games VARCHAR(100) DEFAULT 'Free'");
     
     await pool.query(`
         CREATE TABLE IF NOT EXISTS absentees (
@@ -2011,6 +2023,16 @@ async function initDatabase() {
     await pool.query(`
         CREATE TABLE IF NOT EXISTS subjects (
             subject_name VARCHAR(100) PRIMARY KEY
+        )
+    `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS od_list (
+            id SERIAL PRIMARY KEY,
+            date DATE,
+            teacher_name VARCHAR(100) REFERENCES teachers(teacher_name) ON DELETE CASCADE,
+            corridor_duty_teacher VARCHAR(100) REFERENCES teachers(teacher_name) ON DELETE SET NULL,
+            UNIQUE (date, teacher_name)
         )
     `);
 
@@ -2169,6 +2191,7 @@ app.get('/api/state', async (req, res) => {
         const subjectsRes = await pool.query("SELECT * FROM subjects ORDER BY subject_name");
         const timingsRes = await pool.query("SELECT * FROM period_timings ORDER BY id");
         const exceptionsRes = await pool.query("SELECT id, teacher_name, except_timing, reason FROM exceptions ORDER BY teacher_name");
+        const odRes = await pool.query("SELECT id, TO_CHAR(date, 'YYYY-MM-DD') as date_str, teacher_name, corridor_duty_teacher FROM od_list ORDER BY date, teacher_name");
         
         const teachersData = teachersRes.rows.map(r => ({
             Teacher_Name: r.teacher_name,
@@ -2182,15 +2205,55 @@ app.get('/api/state', async (req, res) => {
         const timetableData = timetableRes.rows.map(r => ({
             Class: r.class_name,
             Day: r.day_name,
-            Period_1: r.period_1,
-            Period_2: r.period_2,
-            Period_3: r.period_3,
-            Period_4: r.period_4,
-            Period_5: r.period_5,
-            Period_6: r.period_6,
-            Period_7: r.period_7,
-            Period_8: r.period_8
+            Class_Incharge: r.class_incharge || 'Free',
+            Period_1: r.period_1 || 'Free',
+            Period_2: r.period_2 || 'Free',
+            Morning_Break: r.morning_break || 'Free',
+            Period_3: r.period_3 || 'Free',
+            Period_4: r.period_4 || 'Free',
+            Lunch_Break: r.lunch_break || 'Free',
+            Period_5: r.period_5 || 'Free',
+            Period_6: r.period_6 || 'Free',
+            Evening_Break: r.evening_break || 'Free',
+            Period_7: r.period_7 || 'Free',
+            Period_8: r.period_8 || 'Free',
+            Diary_Games: r.diary_games || 'Free'
         }));
+        
+        const daysOrder = {
+            'monday': 1,
+            'tuesday': 2,
+            'wednesday': 3,
+            'thursday': 4,
+            'friday': 5,
+            'saturday': 6,
+            'sunday': 7
+        };
+        
+        timetableData.sort((a, b) => {
+            const numA = parseInt(a.Class, 10);
+            const numB = parseInt(b.Class, 10);
+            
+            if (isNaN(numA) && isNaN(numB)) {
+                const cmp = a.Class.localeCompare(b.Class);
+                if (cmp !== 0) return cmp;
+            } else if (isNaN(numA)) {
+                return 1;
+            } else if (isNaN(numB)) {
+                return -1;
+            } else if (numA !== numB) {
+                return numA - numB;
+            } else {
+                const cmp = a.Class.localeCompare(b.Class);
+                if (cmp !== 0) return cmp;
+            }
+            
+            const dayA = (a.Day || '').toLowerCase();
+            const dayB = (b.Day || '').toLowerCase();
+            const orderA = daysOrder[dayA] || 99;
+            const orderB = daysOrder[dayB] || 99;
+            return orderA - orderB;
+        });
         
         const absenteesData = absenteesRes.rows.map(r => ({
             Date: r.date_str,
@@ -2211,6 +2274,19 @@ app.get('/api/state', async (req, res) => {
         }));
 
         const classesData = classesRes.rows.map(r => r.class_name);
+        classesData.sort((a, b) => {
+            const numA = parseInt(a, 10);
+            const numB = parseInt(b, 10);
+            if (isNaN(numA) && isNaN(numB)) {
+                return a.localeCompare(b);
+            }
+            if (isNaN(numA)) return 1;
+            if (isNaN(numB)) return -1;
+            if (numA !== numB) {
+                return numA - numB;
+            }
+            return a.localeCompare(b);
+        });
         const subjectsData = subjectsRes.rows.map(r => r.subject_name);
         const timingsData = timingsRes.rows.map(r => ({
             id: r.id,
@@ -2226,6 +2302,13 @@ app.get('/api/state', async (req, res) => {
             Reason: r.reason || ''
         }));
         
+        const odData = odRes.rows.map(r => ({
+            id: r.id,
+            Date: r.date_str,
+            Teacher_Name: r.teacher_name,
+            Corridor_Duty_Teacher: r.corridor_duty_teacher || ''
+        }));
+        
         res.json({
             teachers: teachersData,
             timetable: timetableData,
@@ -2234,7 +2317,8 @@ app.get('/api/state', async (req, res) => {
             classes: classesData,
             subjects: subjectsData,
             timings: timingsData,
-            exceptions: exceptionsData
+            exceptions: exceptionsData,
+            odList: odData
         });
     } catch (err) {
         console.error("Error fetching state:", err);
@@ -2504,12 +2588,71 @@ app.delete('/api/exceptions', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Add teacher to OD list
+app.post('/api/od', async (req, res) => {
+    const { Date, Teacher_Name } = req.body;
+    try {
+        await pool.query(
+            "INSERT INTO od_list (date, teacher_name) VALUES ($1, $2) ON CONFLICT (date, teacher_name) DO NOTHING",
+            [Date, Teacher_Name]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Remove teacher from OD list
+app.delete('/api/od', async (req, res) => {
+    const { id } = req.query;
+    try {
+        await pool.query("DELETE FROM od_list WHERE id = $1", [parseInt(id, 10)]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Update corridor duty teacher for an OD record
+app.post('/api/od/corridor', async (req, res) => {
+    const { Date, Teacher_Name, Corridor_Duty_Teacher } = req.body;
+    try {
+        const val = Corridor_Duty_Teacher || null;
+        await pool.query(
+            "UPDATE od_list SET corridor_duty_teacher = $1 WHERE date = $2 AND teacher_name = $3",
+            [val, Date, Teacher_Name]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Update cell in timetable
 app.post('/api/timetable/cell', async (req, res) => {
     const { Class, Day, Period, Value } = req.body;
     try {
+        let colName = String(Period).toLowerCase();
+        if (colName === '1') colName = 'period_1';
+        else if (colName === '2') colName = 'period_2';
+        else if (colName === '3') colName = 'period_3';
+        else if (colName === '4') colName = 'period_4';
+        else if (colName === '5') colName = 'period_5';
+        else if (colName === '6') colName = 'period_6';
+        else if (colName === '7') colName = 'period_7';
+        else if (colName === '8') colName = 'period_8';
+        
+        const allowedColumns = [
+            'class_incharge', 'period_1', 'period_2', 'morning_break', 
+            'period_3', 'period_4', 'lunch_break', 'period_5', 
+            'period_6', 'evening_break', 'period_7', 'period_8', 'diary_games'
+        ];
+        if (!allowedColumns.includes(colName)) {
+            return res.status(400).json({ error: "Invalid column name for period update" });
+        }
+        
         await pool.query(
-            `UPDATE timetable SET period_${Period} = $1 WHERE class_name = $2 AND day_name = $3`,
+            `UPDATE timetable SET ${colName} = $1 WHERE class_name = $2 AND day_name = $3`,
             [Value, Class, Day]
         );
         res.json({ success: true });
@@ -2549,6 +2692,7 @@ app.post('/api/substitutions/calculate', async (req, res) => {
         const absenteesRes = await pool.query("SELECT * FROM absentees WHERE date = $1 AND status = 'Absent'", [dateStr]);
         const exceptionsRes = await pool.query("SELECT teacher_name, except_timing FROM exceptions");
         const timingsRes = await pool.query("SELECT * FROM period_timings ORDER BY id");
+        const odRes = await pool.query("SELECT teacher_name FROM od_list WHERE date = $1", [dateStr]);
         
         const exceptedMap = {};
         exceptionsRes.rows.forEach(r => {
@@ -2559,6 +2703,8 @@ app.post('/api/substitutions/calculate', async (req, res) => {
         const timetableMap = timetableRes.rows;
         const timingsMap = timingsRes.rows;
         const absentNames = absenteesRes.rows.map(r => r.teacher_name);
+        const odNames = odRes.rows.map(r => r.teacher_name);
+        const allUnavailableNames = [...absentNames, ...odNames];
         
         await pool.query("DELETE FROM sub_log WHERE date = $1", [dateStr]);
         
@@ -2570,8 +2716,14 @@ app.post('/api/substitutions/calculate', async (req, res) => {
                 for (let p = 1; p <= 8; p++) {
                     const key = `period_${p}`;
                     const teacher = row[key];
-                    if (teacher && teacher !== 'Free' && absentNames.includes(teacher)) {
-                        const isAbsent = isTeacherAbsentForPeriod(absenteesRes.rows, teacher, p, timingsMap);
+                    if (teacher && teacher !== 'Free' && allUnavailableNames.includes(teacher)) {
+                        let isAbsent = false;
+                        if (odNames.includes(teacher)) {
+                            isAbsent = true; // OD is full day absent
+                        } else {
+                            isAbsent = isTeacherAbsentForPeriod(absenteesRes.rows, teacher, p, timingsMap);
+                        }
+                        
                         if (isAbsent) {
                             // If absent teacher is excepted for this specific period — skip creating requirement (no sub assigned)
                             if (exceptedMap.hasOwnProperty(teacher) && isPeriodCoveredByTiming(exceptedMap[teacher], p, timingsMap)) {
@@ -2590,26 +2742,51 @@ app.post('/api/substitutions/calculate', async (req, res) => {
                 }
             }
         });
-        // 2. Supervision slots (Class Incharge, Breaks, Lunch, Games) for absent Class Teachers
-        absenteesRes.rows.forEach(absentee => {
-            const name = absentee.teacher_name;
-            const record = teachersMap.find(t => t.teacher_name === name);
-            if (record && record.teacher_type === 'Class Teacher' && record.class_name) {
-                const specialPeriods = [0, 9, 10, 11, 12];
-                specialPeriods.forEach(sp => {
-                    if (isAbsentForSupervision(absentee, sp, timingsMap)) {
-                        // Skip supervision requirement if excepted for this specific slot
-                        if (exceptedMap.hasOwnProperty(name) && isPeriodCoveredByTiming(exceptedMap[name], sp, timingsMap)) {
-                            return;
+        // 2. Supervision slots (Class Incharge, Breaks, Lunch, Games) based on timetable with fallback to Class Teacher
+        const specialPeriodMapping = {
+            0: 'class_incharge',
+            9: 'morning_break',
+            10: 'lunch_break',
+            11: 'evening_break',
+            12: 'diary_games'
+        };
+        timetableMap.forEach(row => {
+            if (row.day_name === day) {
+                [0, 9, 10, 11, 12].forEach(sp => {
+                    const colKey = specialPeriodMapping[sp];
+                    let teacher = row[colKey];
+                    
+                    // Fallback to Class Teacher if 'Free'
+                    if (!teacher || teacher === 'Free') {
+                        const ct = teachersMap.find(t => t.class_name === row.class_name && t.teacher_type === 'Class Teacher');
+                        if (ct) {
+                            teacher = ct.teacher_name;
                         }
-                        requirements.push({
-                            class: record.class_name,
-                            day: day,
-                            date: dateStr,
-                            period: sp,
-                            absentTeacher: name,
-                            subject: 'Supervision'
-                        });
+                    }
+                    
+                    if (teacher && teacher !== 'Free' && allUnavailableNames.includes(teacher)) {
+                        let isUnavailable = false;
+                        if (odNames.includes(teacher)) {
+                            isUnavailable = true; // OD is full day absent
+                        } else {
+                            const absentee = absenteesRes.rows.find(a => a.teacher_name === teacher);
+                            isUnavailable = absentee && isAbsentForSupervision(absentee, sp, timingsMap);
+                        }
+                        
+                        if (isUnavailable) {
+                            // Skip supervision requirement if excepted for this specific slot
+                            if (exceptedMap.hasOwnProperty(teacher) && isPeriodCoveredByTiming(exceptedMap[teacher], sp, timingsMap)) {
+                                return;
+                            }
+                            requirements.push({
+                                class: row.class_name,
+                                day: day,
+                                date: dateStr,
+                                period: sp,
+                                absentTeacher: teacher,
+                                subject: 'Supervision'
+                            });
+                        }
                     }
                 });
             }
@@ -2651,7 +2828,7 @@ app.post('/api/substitutions/calculate', async (req, res) => {
         const activeSubs = [];
         for (const req of requirements) {
             // Pass exceptedMap, weeklySubMap, and timingsMap
-            const sub = findSubstituteForPeriod(req, activeSubs, teachersMap, timetableMap, absenteesRes.rows, exceptedMap, weeklySubMap, timingsMap);
+            const sub = findSubstituteForPeriod(req, activeSubs, teachersMap, timetableMap, absenteesRes.rows, exceptedMap, weeklySubMap, timingsMap, odNames);
             await pool.query(
                 `INSERT INTO sub_log 
                 (date, day_name, period_num, class_name, subject_name, absent_teacher, substitute_teacher)
@@ -2872,7 +3049,20 @@ function getWeeklyScheduledPeriodsCount(timetable, name) {
     return count;
 }
 
-function findSubstituteForPeriod(req, activeSubs, teachers, timetable, absentees, exceptedMap = {}, weeklySubMap = {}, timingsMap = []) {
+function isTeacherBusyWithSupervision(timetable, name, day, period) {
+    const periodToColMap = {
+        0: 'class_incharge',
+        9: 'morning_break',
+        10: 'lunch_break',
+        11: 'evening_break',
+        12: 'diary_games'
+    };
+    const colName = periodToColMap[period];
+    if (!colName) return false;
+    return timetable.some(row => row.day_name === day && row[colName] === name);
+}
+
+function findSubstituteForPeriod(req, activeSubs, teachers, timetable, absentees, exceptedMap = {}, weeklySubMap = {}, timingsMap = [], odNames = []) {
     const { day, date, period, absentTeacher, subject } = req;
     const isSupervision = [0, 9, 10, 11, 12].includes(period);
     const periodKey = `Period_${period}`;
@@ -2882,6 +3072,9 @@ function findSubstituteForPeriod(req, activeSubs, teachers, timetable, absentees
     teachers.forEach(teacherRecord => {
         const name = teacherRecord.teacher_name;
         if (!name || name === absentTeacher) return;
+        
+        // Skip teachers who are on OD today
+        if (odNames.includes(name)) return;
         
         // Skip teachers who are in the exceptions list for this period
         if (exceptedMap.hasOwnProperty(name) && isPeriodCoveredByTiming(exceptedMap[name], period, timingsMap)) return;
@@ -2898,6 +3091,8 @@ function findSubstituteForPeriod(req, activeSubs, teachers, timetable, absentees
         if (isSupervision) {
             // Only Non Class Teachers can do break supervision duties
             if (teacherRecord.teacher_type !== 'Non Class Teacher') return;
+            // Check if originally busy with this supervision slot on this day
+            if (isTeacherBusyWithSupervision(timetable, name, day, period)) return;
         }
         
         // 3. Conflict checks
