@@ -108,6 +108,8 @@ function initUI() {
             if (tabId === 'tab-timings') renderTimingsEditor();
             if (tabId === 'tab-subassigned') renderDashboard();
             if (tabId === 'tab-except') renderExceptTab();
+            if (tabId === 'tab-od') renderODTab();
+            if (tabId === 'tab-corridorduty') renderCorridorDutyTab();
             if (tabId === 'tab-settings') loadSettingsTab();
         });
     });
@@ -133,13 +135,20 @@ function initUI() {
     const todayStr = new Date().toISOString().split('T')[0];
     
     datePicker.value = todayStr;
+    const odDatePicker = document.getElementById('od-date-picker');
+    const corridorDatePicker = document.getElementById('corridor-date-picker');
+    
     if (visibleDatePicker) visibleDatePicker.value = todayStr;
     if (subAssignedDatePicker) subAssignedDatePicker.value = todayStr;
+    if (odDatePicker) odDatePicker.value = todayStr;
+    if (corridorDatePicker) corridorDatePicker.value = todayStr;
     
     if (visibleDatePicker) {
         visibleDatePicker.addEventListener('change', () => {
             datePicker.value = visibleDatePicker.value;
             if (subAssignedDatePicker) subAssignedDatePicker.value = visibleDatePicker.value;
+            if (odDatePicker) odDatePicker.value = visibleDatePicker.value;
+            if (corridorDatePicker) corridorDatePicker.value = visibleDatePicker.value;
             renderDashboard();
         });
     }
@@ -148,7 +157,31 @@ function initUI() {
         subAssignedDatePicker.addEventListener('change', () => {
             datePicker.value = subAssignedDatePicker.value;
             if (visibleDatePicker) visibleDatePicker.value = subAssignedDatePicker.value;
+            if (odDatePicker) odDatePicker.value = subAssignedDatePicker.value;
+            if (corridorDatePicker) corridorDatePicker.value = subAssignedDatePicker.value;
             renderDashboard();
+        });
+    }
+    
+    if (odDatePicker) {
+        odDatePicker.addEventListener('change', () => {
+            datePicker.value = odDatePicker.value;
+            if (visibleDatePicker) visibleDatePicker.value = odDatePicker.value;
+            if (subAssignedDatePicker) subAssignedDatePicker.value = odDatePicker.value;
+            if (corridorDatePicker) corridorDatePicker.value = odDatePicker.value;
+            renderODTab();
+            renderCorridorDutyTab();
+        });
+    }
+    
+    if (corridorDatePicker) {
+        corridorDatePicker.addEventListener('change', () => {
+            datePicker.value = corridorDatePicker.value;
+            if (visibleDatePicker) visibleDatePicker.value = corridorDatePicker.value;
+            if (subAssignedDatePicker) subAssignedDatePicker.value = corridorDatePicker.value;
+            if (odDatePicker) odDatePicker.value = corridorDatePicker.value;
+            renderODTab();
+            renderCorridorDutyTab();
         });
     }
     
@@ -755,9 +788,6 @@ async function renderDashboard() {
         tr.innerHTML = html;
         tbody.appendChild(tr);
     });
-    
-    // Render the On Duty and Corridor Duty cards
-    renderODDashboardCards();
 }
 
 function findClassForTeacherPeriod(teacherName, dayName, p) {
@@ -1863,10 +1893,16 @@ async function loadSettingsTab() {
     }
 }
 
-function renderODDashboardCards() {
+function renderODTab() {
     const selectedDate = document.getElementById('selected-date').value;
     
-    // Populate the OD teacher select dropdown (all teachers)
+    // Sync the local tab date picker
+    const odDatePicker = document.getElementById('od-date-picker');
+    if (odDatePicker) {
+        odDatePicker.value = selectedDate;
+    }
+    
+    // Populate the OD teacher select dropdown
     const odTeacherSelect = document.getElementById('od-teacher-select');
     if (odTeacherSelect) {
         odTeacherSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
@@ -1876,24 +1912,18 @@ function renderODDashboardCards() {
     }
     
     const isTeacherRole = localStorage.getItem('user_role') === 'Teacher';
-    
-    // Hide the Log On Duty form if Teacher role
-    const odLoggingCard = document.getElementById('od-logging-card');
-    if (odLoggingCard) {
-        const addForm = document.getElementById('add-od-form');
-        if (addForm) {
-            addForm.style.display = isTeacherRole ? 'none' : 'flex';
-        }
+    const addForm = document.getElementById('add-od-form');
+    if (addForm) {
+        addForm.style.display = isTeacherRole ? 'none' : 'flex';
     }
     
-    // 1. Populate the On Duty (OD) Table
     const odTbody = document.getElementById('od-tbody');
     if (odTbody) {
         odTbody.innerHTML = '';
         const dailyODList = (state.odList || []).filter(item => item.Date === selectedDate);
         
         if (dailyODList.length === 0) {
-            odTbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--text-secondary); padding: 12px;">No teachers on OD.</td></tr>';
+            odTbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--text-secondary); padding: 16px;">No teachers on On Duty (OD) for this date.</td></tr>';
         } else {
             dailyODList.forEach(item => {
                 const tr = document.createElement('tr');
@@ -1904,14 +1934,23 @@ function renderODDashboardCards() {
                 `;
                 tr.innerHTML = `
                     <td><strong>${item.Teacher_Name}</strong></td>
-                    <td>${actionBtnHTML}</td>
+                    <td style="width:120px;">${actionBtnHTML}</td>
                 `;
                 odTbody.appendChild(tr);
             });
         }
     }
+}
+
+function renderCorridorDutyTab() {
+    const selectedDate = document.getElementById('selected-date').value;
     
-    // 2. Populate the Corridor Duty Table
+    // Sync the local tab date picker
+    const corridorDatePicker = document.getElementById('corridor-date-picker');
+    if (corridorDatePicker) {
+        corridorDatePicker.value = selectedDate;
+    }
+    
     const corridorTbody = document.getElementById('corridor-duty-tbody');
     if (corridorTbody) {
         corridorTbody.innerHTML = '';
@@ -1926,8 +1965,10 @@ function renderODDashboardCards() {
             !odNamesForDate.includes(t.Teacher_Name)
         );
         
+        const isTeacherRole = localStorage.getItem('user_role') === 'Teacher';
+        
         if (dailyODList.length === 0) {
-            corridorTbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--text-secondary); padding: 12px;">No teachers on OD.</td></tr>';
+            corridorTbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--text-secondary); padding: 16px;">No teachers on On Duty (OD) for this date.</td></tr>';
         } else {
             dailyODList.forEach(item => {
                 const tr = document.createElement('tr');
@@ -1976,7 +2017,8 @@ async function handleAddOD(e) {
     });
     
     await fetchState();
-    renderDashboard();
+    renderODTab();
+    renderCorridorDutyTab();
 }
 
 async function removeOD(id) {
@@ -1984,7 +2026,8 @@ async function removeOD(id) {
         method: 'DELETE'
     });
     await fetchState();
-    renderDashboard();
+    renderODTab();
+    renderCorridorDutyTab();
 }
 
 async function assignCorridorDuty(date, teacher, dutyTeacher) {
@@ -1998,7 +2041,8 @@ async function assignCorridorDuty(date, teacher, dutyTeacher) {
         })
     });
     await fetchState();
-    renderDashboard();
+    renderODTab();
+    renderCorridorDutyTab();
 }
 
 function getSupervisionIndexFromName(name) {

@@ -107,6 +107,14 @@
         <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
         <span>Except</span>
       </li>
+      <li class="nav-item" data-tab="tab-od">
+        <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <span>OD</span>
+      </li>
+      <li class="nav-item" data-tab="tab-corridorduty">
+        <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+        <span>Corridor Duty</span>
+      </li>
       <li class="nav-item" data-tab="tab-settings">
         <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
         <span>Settings</span>
@@ -257,62 +265,6 @@
           </div>
           <div class="absentees-list" id="today-absentees">
             <!-- Populated dynamically -->
-          </div>
-        </div>
-
-        <!-- On Duty (OD) Logging Card -->
-        <div class="card" id="od-logging-card">
-          <div class="card-header">
-            <h2>Log Teacher On Duty (OD)</h2>
-          </div>
-          <div class="card-body">
-            <!-- Add OD Teacher Form -->
-            <form id="add-od-form" style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px;">
-              <div class="form-group" style="margin-bottom:0;">
-                <label for="od-teacher-select">Select Teacher</label>
-                <select id="od-teacher-select" required style="width:100%; padding:8px; border-radius:6px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); height: 38px;">
-                  <!-- Populated dynamically -->
-                </select>
-              </div>
-              <button type="submit" class="btn btn-primary" style="width:100%; height:38px;">+ Add to OD</button>
-            </form>
-            
-            <!-- OD List Table -->
-            <div class="table-wrapper">
-              <table style="width:100%; border-collapse:collapse; text-align:center; font-size:13px;">
-                <thead>
-                  <tr>
-                    <th>Teacher Name</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody id="od-tbody">
-                  <!-- Populated dynamically -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- Corridor Duty Assignment Card -->
-        <div class="card" id="corridor-duty-card">
-          <div class="card-header">
-            <h2>Corridor Duty Assignment</h2>
-          </div>
-          <div class="card-body">
-            <div class="table-wrapper">
-              <table style="width:100%; border-collapse:collapse; text-align:center; font-size:13px;">
-                <thead>
-                  <tr>
-                    <th>On Duty Teacher</th>
-                    <th>Corridor Duty Teacher (Non Class Teachers Only)</th>
-                  </tr>
-                </thead>
-                <tbody id="corridor-duty-tbody">
-                  <!-- Populated dynamically -->
-                </tbody>
-              </table>
-            </div>
           </div>
         </div>
 
@@ -557,6 +509,78 @@
                 <!-- Populated dynamically -->
               </tbody>
             </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: OD -->
+    <section class="tab-view" id="tab-od">
+      <div class="dashboard-grid" style="grid-template-columns: 1fr; max-width: 800px; margin: 0 auto;">
+        <div class="card full-width" style="box-sizing:border-box;">
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>Log On Duty (OD)</h2>
+            <div style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-secondary);">
+              <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+              <input type="date" id="od-date-picker" style="background:var(--bg-tertiary); border:1px solid var(--border-color); border-radius:6px; padding:4px 8px; color:var(--text-primary); font-size:13px; cursor:pointer;">
+            </div>
+          </div>
+          <div class="card-body" style="padding: 20px;">
+            <!-- Add OD Teacher Form -->
+            <form id="add-od-form" style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px; max-width: 400px;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label for="od-teacher-select">Select Teacher</label>
+                <select id="od-teacher-select" required style="width:100%; padding:8px; border-radius:6px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); height: 38px; cursor: pointer;">
+                  <!-- Populated dynamically -->
+                </select>
+              </div>
+              <button type="submit" class="btn btn-primary" style="width:100%; height:38px;">+ Add to OD</button>
+            </form>
+            
+            <!-- OD List Table -->
+            <div class="table-wrapper">
+              <table style="width:100%; border-collapse:collapse; text-align:center; font-size:13px;">
+                <thead>
+                  <tr>
+                    <th>Teacher Name</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="od-tbody">
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: CORRIDOR DUTY -->
+    <section class="tab-view" id="tab-corridorduty">
+      <div class="dashboard-grid" style="grid-template-columns: 1fr; max-width: 800px; margin: 0 auto;">
+        <div class="card full-width" style="box-sizing:border-box;">
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>Corridor Duty Assignment</h2>
+            <div style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-secondary);">
+              <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+              <input type="date" id="corridor-date-picker" style="background:var(--bg-tertiary); border:1px solid var(--border-color); border-radius:6px; padding:4px 8px; color:var(--text-primary); font-size:13px; cursor:pointer;">
+            </div>
+          </div>
+          <div class="card-body" style="padding: 20px;">
+            <div class="table-wrapper">
+              <table style="width:100%; border-collapse:collapse; text-align:center; font-size:13px;">
+                <thead>
+                  <tr>
+                    <th>On Duty Teacher</th>
+                    <th>Corridor Duty Teacher (Non Class Teachers Only)</th>
+                  </tr>
+                </thead>
+                <tbody id="corridor-duty-tbody">
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
