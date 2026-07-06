@@ -2024,7 +2024,7 @@ function renderCorridorDutyTab() {
         const dailyCorridorDuties = (state.corridorDuties || []).filter(cd => cd.Date === selectedDate);
         
         if (dailyCorridorDuties.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-secondary); padding:16px;">No corridor duties assigned for this date.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-secondary); padding:16px;">No corridor duties assigned for this date.</td></tr>';
         } else {
             dailyCorridorDuties.forEach(d => {
                 const tr = document.createElement('tr');
@@ -2034,7 +2034,6 @@ function renderCorridorDutyTab() {
                     </button>
                 `;
                 tr.innerHTML = `
-                    <td style="padding:12px;"><strong>${d.Corridor_Name}</strong></td>
                     <td style="padding:12px;"><strong>${d.Corridor_Time}</strong></td>
                     <td style="padding:12px; font-weight:600; color:var(--primary-color);">${d.Duty_Teacher}</td>
                     <td style="padding:12px;">${actionHTML}</td>
@@ -2048,7 +2047,6 @@ function renderCorridorDutyTab() {
 async function handleAssignCorridorDuty(e) {
     e.preventDefault();
     const date = document.getElementById('selected-date').value;
-    const nameInput = document.getElementById('global-corridor-name-input').value;
     
     // Fetch all timings input fields
     const timingInputs = Array.from(document.querySelectorAll('.global-corridor-time-input'));
@@ -2056,7 +2054,7 @@ async function handleAssignCorridorDuty(e) {
     
     const teacherSelect = document.getElementById('global-corridor-teacher-select').value;
     
-    if (!nameInput || times.length === 0 || !teacherSelect || !date) return;
+    if (times.length === 0 || !teacherSelect || !date) return;
     
     // Make separate fetch POST requests
     const promises = times.map(time => {
@@ -2065,7 +2063,6 @@ async function handleAssignCorridorDuty(e) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 Date: date,
-                Corridor_Name: nameInput,
                 Corridor_Time: time,
                 Duty_Teacher: teacherSelect
             })
@@ -2073,9 +2070,6 @@ async function handleAssignCorridorDuty(e) {
     });
     
     await Promise.all(promises);
-    
-    // Reset fields
-    document.getElementById('global-corridor-name-input').value = '';
     
     // Reset timings container to a single row
     const timingsContainer = document.getElementById('corridor-timings-container');
