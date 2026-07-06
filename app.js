@@ -1946,122 +1946,74 @@ function renderODTab() {
 function renderCorridorDutyTab() {
     const selectedDate = document.getElementById('selected-date').value;
     
-    // Sync the local tab date picker
+    // Sync local date picker
     const corridorDatePicker = document.getElementById('corridor-date-picker');
     if (corridorDatePicker) {
         corridorDatePicker.value = selectedDate;
     }
     
-    const container = document.getElementById('corridor-duty-container');
-    if (!container) return;
-    
-    container.innerHTML = '';
-    
+    // Populate Duty Teacher dropdown
+    const globalTeacherSelect = document.getElementById('global-corridor-teacher-select');
     const dailyODList = (state.odList || []).filter(item => item.Date === selectedDate);
     const absentNames = state.absentees.filter(a => a.Date === selectedDate && a.Status === 'Absent').map(a => a.Teacher_Name);
     const odNamesForDate = dailyODList.map(item => item.Teacher_Name);
     
-    // Eligible Non Class Teachers
     const eligibleDutyTeachers = state.teachers.filter(t => 
         t.Teacher_Type === 'Non Class Teacher' && 
         !absentNames.includes(t.Teacher_Name) && 
         !odNamesForDate.includes(t.Teacher_Name)
     );
     
-    const isTeacherRole = localStorage.getItem('user_role') === 'Teacher';
-    
-    if (dailyODList.length === 0) {
-        container.innerHTML = '<div style="text-align:center; color:var(--text-secondary); padding: 24px; background: var(--bg-tertiary); border-radius: 8px;">No teachers on On Duty (OD) for this date. Log a teacher on OD first under the "OD" tab.</div>';
-        return;
+    if (globalTeacherSelect) {
+        globalTeacherSelect.innerHTML = '<option value="">-- Select Non Class Teacher --</option>';
+        eligibleDutyTeachers.forEach(dt => {
+            globalTeacherSelect.innerHTML += `<option value="${dt.Teacher_Name}">${dt.Teacher_Name}</option>`;
+        });
     }
     
-    dailyODList.forEach(item => {
-        const odTeacher = item.Teacher_Name;
+    const isTeacherRole = localStorage.getItem('user_role') === 'Teacher';
+    const form = document.getElementById('assign-corridor-form');
+    if (form) {
+        form.style.display = isTeacherRole ? 'none' : 'flex';
+    }
+    
+    // Wire up form submission if not already done
+    if (form && !form.dataset.listenerAttached) {
+        form.addEventListener('submit', handleAssignCorridorDuty);
+        form.dataset.listenerAttached = 'true';
+    }
+    
+    const tbody = document.getElementById('corridor-duty-tbody');
+    if (tbody) {
+        tbody.innerHTML = '';
+        const dailyCorridorDuties = (state.corridorDuties || []).filter(cd => cd.Date === selectedDate);
         
-        // Find assigned duties for this teacher on this date
-        const assignedDuties = (state.corridorDuties || []).filter(cd => cd.Date === selectedDate && cd.OD_Teacher === odTeacher);
-        
-        // Build option list for duty teachers
-        let dutyOptionsHTML = '<option value="">-- Select Non Class Teacher --</option>';
-        eligibleDutyTeachers.forEach(dt => {
-            dutyOptionsHTML += `<option value="${dt.Teacher_Name}">${dt.Teacher_Name}</option>`;
-        });
-        
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.style.background = 'var(--bg-tertiary)';
-        card.style.border = '1px solid var(--border-color)';
-        card.style.borderRadius = '8px';
-        card.style.padding = '16px';
-        
-        // Form markup (only visible to Admin)
-        const formHTML = isTeacherRole ? '' : `
-            <form onsubmit="handleAssignCorridorDuty(event, '${odTeacher}')" style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:16px; align-items:flex-end;">
-                <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px;">
-                    <label style="font-size:12px; margin-bottom:4px;">Corridor Time / Timing</label>
-                    <input type="text" required placeholder="e.g. Morning Break or 11:20" list="corridor-timings-list" class="corridor-time-input" style="width:100%; height:38px; padding:8px; border-radius:6px; background:var(--bg-secondary); border:1px solid var(--border-color); color:var(--text-primary);">
-                </div>
-                <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px;">
-                    <label style="font-size:12px; margin-bottom:4px;">Duty Teacher</label>
-                    <select required class="corridor-teacher-select" style="width:100%; height:38px; padding:8px; border-radius:6px; background:var(--bg-secondary); border:1px solid var(--border-color); color:var(--text-primary); cursor:pointer;">
-                        ${dutyOptionsHTML}
-                    </select>
-                </div>
-                <button type="submit" class="btn btn-primary" style="height:38px; padding:0 20px;">Assign</button>
-            </form>
-        `;
-        
-        // Table markup
-        let rowsHTML = '';
-        if (assignedDuties.length === 0) {
-            rowsHTML = `<tr><td colspan="3" style="text-align:center; color:var(--text-secondary); padding:10px;">No corridor duties assigned yet.</td></tr>`;
+        if (dailyCorridorDuties.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-secondary); padding:16px;">No corridor duties assigned for this date.</td></tr>';
         } else {
-            assignedDuties.forEach(d => {
+            dailyCorridorDuties.forEach(d => {
+                const tr = document.createElement('tr');
                 const actionHTML = isTeacherRole ? '-' : `
-                    <button class="btn btn-secondary btn-sm" onclick="removeCorridorDuty('${d.id}')" style="color:var(--text-danger); border-color:var(--text-danger); background:none; padding:4px 8px; font-size:11px; cursor:pointer;">
+                    <button class="btn btn-secondary btn-sm" onclick="removeCorridorDuty('${d.id}')" style="color:var(--text-danger); border-color:var(--text-danger); background:none; padding:4px 8px; font-size:12px; cursor:pointer;">
                         Remove
                     </button>
                 `;
-                rowsHTML += `
-                    <tr>
-                        <td style="padding:10px; font-weight:500;">${d.Corridor_Time}</td>
-                        <td style="padding:10px; font-weight:600; color:var(--primary-color);">${d.Duty_Teacher}</td>
-                        <td style="padding:10px;">${actionHTML}</td>
-                    </tr>
+                tr.innerHTML = `
+                    <td style="padding:12px;"><strong>${d.Corridor_Time}</strong></td>
+                    <td style="padding:12px; font-weight:600; color:var(--primary-color);">${d.Duty_Teacher}</td>
+                    <td style="padding:12px;">${actionHTML}</td>
                 `;
+                tbody.appendChild(tr);
             });
         }
-        
-        card.innerHTML = `
-            <h3 style="margin-top:0; margin-bottom:12px; font-size:15px; border-bottom:1px solid var(--border-color); padding-bottom:8px;">
-                On Duty Teacher: <span style="color:var(--primary-color);">${odTeacher}</span>
-            </h3>
-            ${formHTML}
-            <div class="table-wrapper" style="margin-top:8px;">
-                <table style="width:100%; border-collapse:collapse; text-align:center; font-size:12px;">
-                    <thead>
-                        <tr>
-                            <th>Corridor Time</th>
-                            <th>Assigned Duty Teacher</th>
-                            <th style="width:80px;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${rowsHTML}
-                    </tbody>
-                </table>
-            </div>
-        `;
-        container.appendChild(card);
-    });
+    }
 }
 
-async function handleAssignCorridorDuty(e, odTeacher) {
+async function handleAssignCorridorDuty(e) {
     e.preventDefault();
-    const form = e.target;
     const date = document.getElementById('selected-date').value;
-    const timeInput = form.querySelector('.corridor-time-input').value;
-    const teacherSelect = form.querySelector('.corridor-teacher-select').value;
+    const timeInput = document.getElementById('global-corridor-time-input').value;
+    const teacherSelect = document.getElementById('global-corridor-teacher-select').value;
     
     if (!timeInput || !teacherSelect || !date) return;
     
@@ -2070,11 +2022,13 @@ async function handleAssignCorridorDuty(e, odTeacher) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             Date: date,
-            OD_Teacher: odTeacher,
             Corridor_Time: timeInput,
             Duty_Teacher: teacherSelect
         })
     });
+    
+    // Clear the time input for subsequent additions
+    document.getElementById('global-corridor-time-input').value = '';
     
     await fetchState();
     renderCorridorDutyTab();

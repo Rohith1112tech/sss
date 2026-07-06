@@ -2036,14 +2036,28 @@ async function initDatabase() {
         )
     `);
 
+    // Migration check for corridor_duties
+    try {
+        const checkCol = await pool.query(`
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name='corridor_duties' AND column_name='od_teacher'
+        `);
+        if (checkCol.rows.length > 0) {
+            console.log("Migrating corridor_duties table (dropping legacy)...");
+            await pool.query("DROP TABLE IF EXISTS corridor_duties CASCADE");
+        }
+    } catch (e) {
+        console.error("Migration check failed:", e);
+    }
+
     await pool.query(`
         CREATE TABLE IF NOT EXISTS corridor_duties (
             id SERIAL PRIMARY KEY,
             date DATE,
-            od_teacher VARCHAR(100) REFERENCES teachers(teacher_name) ON DELETE CASCADE,
             corridor_time VARCHAR(100),
             duty_teacher VARCHAR(100) REFERENCES teachers(teacher_name) ON DELETE SET NULL,
-            UNIQUE (date, od_teacher, corridor_time)
+            UNIQUE (date, corridor_time, duty_teacher)
         )
     `);
 
@@ -2203,7 +2217,7 @@ app.get('/api/state', async (req, res) => {
         const timingsRes = await pool.query("SELECT * FROM period_timings ORDER BY id");
         const exceptionsRes = await pool.query("SELECT id, teacher_name, except_timing, reason FROM exceptions ORDER BY teacher_name");
         const odRes = await pool.query("SELECT id, TO_CHAR(date, 'YYYY-MM-DD') as date_str, teacher_name, corridor_duty_teacher FROM od_list ORDER BY date, teacher_name");
-        const corridorRes = await pool.query("SELECT id, TO_CHAR(date, 'YYYY-MM-DD') as date_str, od_teacher, corridor_time, duty_teacher FROM corridor_duties ORDER BY date, od_teacher, corridor_time");
+        const corridorRes = await pool.query("SELECT id, TO_CHAR(date, 'YYYY-MM-DD') as date_str, corridor_time, duty_teacher FROM corridor_duties ORDER BY date, corridor_time");
         
         const teachersData = teachersRes.rows.map(r => ({
             Teacher_Name: r.teacher_name,
@@ -2324,7 +2338,6 @@ app.get('/api/state', async (req, res) => {
         const corridorData = corridorRes.rows.map(r => ({
             id: r.id,
             Date: r.date_str,
-            OD_Teacher: r.od_teacher,
             Corridor_Time: r.corridor_time,
             Duty_Teacher: r.duty_teacher || ''
         }));
@@ -2651,15 +2664,15 @@ app.post('/api/od/corridor', async (req, res) => {
 
 // Add or update corridor duty timing
 app.post('/api/corridor-duty', async (req, res) => {
-    const { Date, OD_Teacher, Corridor_Time, Duty_Teacher } = req.body;
+    const { Date, Corridor_Time, Duty_Teacher } = req.body;
     try {
         const val = Duty_Teacher || null;
         await pool.query(
-            `INSERT INTO corridor_duties (date, od_teacher, corridor_time, duty_teacher)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (date, od_teacher, corridor_time)
-             DO UPDATE SET duty_teacher = $4`,
-            [Date, OD_Teacher, Corridor_Time, val]
+            `INSERT INTO corridor_duties (date, corridor_time, duty_teacher)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (date, corridor_time, duty_teacher)
+             DO NOTHING`,
+            [Date, Corridor_Time, val]
         );
         res.json({ success: true });
     } catch (err) {
