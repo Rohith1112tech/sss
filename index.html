@@ -568,18 +568,23 @@
             </div>
           </div>
           <div class="card-body" style="padding: 20px;">
-            <div class="table-wrapper">
-              <table style="width:100%; border-collapse:collapse; text-align:center; font-size:13px;">
-                <thead>
-                  <tr>
-                    <th>On Duty Teacher</th>
-                    <th>Corridor Duty Teacher (Non Class Teachers Only)</th>
-                  </tr>
-                </thead>
-                <tbody id="corridor-duty-tbody">
-                  <!-- Populated dynamically -->
-                </tbody>
-              </table>
+            <datalist id="corridor-timings-list">
+              <option value="Class Incharge"></option>
+              <option value="Period 1"></option>
+              <option value="Period 2"></option>
+              <option value="Morning Break"></option>
+              <option value="Period 3"></option>
+              <option value="Period 4"></option>
+              <option value="Lunch Break"></option>
+              <option value="Period 5"></option>
+              <option value="Period 6"></option>
+              <option value="Evening Break"></option>
+              <option value="Period 7"></option>
+              <option value="Period 8"></option>
+              <option value="Diary / Games"></option>
+            </datalist>
+            <div id="corridor-duty-container" style="display:flex; flex-direction:column; gap:20px;">
+              <!-- Populated dynamically -->
             </div>
           </div>
         </div>

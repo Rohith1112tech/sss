@@ -2036,6 +2036,17 @@ async function initDatabase() {
         )
     `);
 
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS corridor_duties (
+            id SERIAL PRIMARY KEY,
+            date DATE,
+            od_teacher VARCHAR(100) REFERENCES teachers(teacher_name) ON DELETE CASCADE,
+            corridor_time VARCHAR(100),
+            duty_teacher VARCHAR(100) REFERENCES teachers(teacher_name) ON DELETE SET NULL,
+            UNIQUE (date, od_teacher, corridor_time)
+        )
+    `);
+
     // Drop legacy primary key if exists to support multiple exceptions per teacher
     try {
         const pkCheck = await pool.query(`
@@ -2192,6 +2203,7 @@ app.get('/api/state', async (req, res) => {
         const timingsRes = await pool.query("SELECT * FROM period_timings ORDER BY id");
         const exceptionsRes = await pool.query("SELECT id, teacher_name, except_timing, reason FROM exceptions ORDER BY teacher_name");
         const odRes = await pool.query("SELECT id, TO_CHAR(date, 'YYYY-MM-DD') as date_str, teacher_name, corridor_duty_teacher FROM od_list ORDER BY date, teacher_name");
+        const corridorRes = await pool.query("SELECT id, TO_CHAR(date, 'YYYY-MM-DD') as date_str, od_teacher, corridor_time, duty_teacher FROM corridor_duties ORDER BY date, od_teacher, corridor_time");
         
         const teachersData = teachersRes.rows.map(r => ({
             Teacher_Name: r.teacher_name,
@@ -2309,6 +2321,14 @@ app.get('/api/state', async (req, res) => {
             Corridor_Duty_Teacher: r.corridor_duty_teacher || ''
         }));
         
+        const corridorData = corridorRes.rows.map(r => ({
+            id: r.id,
+            Date: r.date_str,
+            OD_Teacher: r.od_teacher,
+            Corridor_Time: r.corridor_time,
+            Duty_Teacher: r.duty_teacher || ''
+        }));
+        
         res.json({
             teachers: teachersData,
             timetable: timetableData,
@@ -2318,7 +2338,8 @@ app.get('/api/state', async (req, res) => {
             subjects: subjectsData,
             timings: timingsData,
             exceptions: exceptionsData,
-            odList: odData
+            odList: odData,
+            corridorDuties: corridorData
         });
     } catch (err) {
         console.error("Error fetching state:", err);
@@ -2628,6 +2649,35 @@ app.post('/api/od/corridor', async (req, res) => {
     }
 });
 
+// Add or update corridor duty timing
+app.post('/api/corridor-duty', async (req, res) => {
+    const { Date, OD_Teacher, Corridor_Time, Duty_Teacher } = req.body;
+    try {
+        const val = Duty_Teacher || null;
+        await pool.query(
+            `INSERT INTO corridor_duties (date, od_teacher, corridor_time, duty_teacher)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (date, od_teacher, corridor_time)
+             DO UPDATE SET duty_teacher = $4`,
+            [Date, OD_Teacher, Corridor_Time, val]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Delete a corridor duty timing
+app.delete('/api/corridor-duty', async (req, res) => {
+    const { id } = req.query;
+    try {
+        await pool.query("DELETE FROM corridor_duties WHERE id = $1", [parseInt(id, 10)]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Update cell in timetable
 app.post('/api/timetable/cell', async (req, res) => {
     const { Class, Day, Period, Value } = req.body;
@@ -2693,6 +2743,7 @@ app.post('/api/substitutions/calculate', async (req, res) => {
         const exceptionsRes = await pool.query("SELECT teacher_name, except_timing FROM exceptions");
         const timingsRes = await pool.query("SELECT * FROM period_timings ORDER BY id");
         const odRes = await pool.query("SELECT teacher_name FROM od_list WHERE date = $1", [dateStr]);
+        const corridorRes = await pool.query("SELECT duty_teacher, corridor_time FROM corridor_duties WHERE date = $1", [dateStr]);
         
         const exceptedMap = {};
         exceptionsRes.rows.forEach(r => {
@@ -2705,6 +2756,7 @@ app.post('/api/substitutions/calculate', async (req, res) => {
         const absentNames = absenteesRes.rows.map(r => r.teacher_name);
         const odNames = odRes.rows.map(r => r.teacher_name);
         const allUnavailableNames = [...absentNames, ...odNames];
+        const corridorAssignments = corridorRes.rows;
         
         await pool.query("DELETE FROM sub_log WHERE date = $1", [dateStr]);
         
@@ -2828,7 +2880,7 @@ app.post('/api/substitutions/calculate', async (req, res) => {
         const activeSubs = [];
         for (const req of requirements) {
             // Pass exceptedMap, weeklySubMap, and timingsMap
-            const sub = findSubstituteForPeriod(req, activeSubs, teachersMap, timetableMap, absenteesRes.rows, exceptedMap, weeklySubMap, timingsMap, odNames);
+            const sub = findSubstituteForPeriod(req, activeSubs, teachersMap, timetableMap, absenteesRes.rows, exceptedMap, weeklySubMap, timingsMap, odNames, corridorAssignments);
             await pool.query(
                 `INSERT INTO sub_log 
                 (date, day_name, period_num, class_name, subject_name, absent_teacher, substitute_teacher)
@@ -3062,7 +3114,43 @@ function isTeacherBusyWithSupervision(timetable, name, day, period) {
     return timetable.some(row => row.day_name === day && row[colName] === name);
 }
 
-function findSubstituteForPeriod(req, activeSubs, teachers, timetable, absentees, exceptedMap = {}, weeklySubMap = {}, timingsMap = [], odNames = []) {
+function isPeriodMatchingCorridorTime(period, corridorTime) {
+    const periodNamesMap = {
+        0: ['class incharge', 'incharge', 'morning roll call'],
+        1: ['period 1', 'p1', '09:30'],
+        2: ['period 2', 'p2', '10:15'],
+        3: ['period 3', 'p3', '11:20'],
+        4: ['period 4', 'p4', '12:00'],
+        5: ['period 5', 'p5', '01:20'],
+        6: ['period 6', 'p6', '02:00'],
+        7: ['period 7', 'p7', '02:50'],
+        8: ['period 8', 'p8', '03:30'],
+        9: ['morning break', 'break 1', 'interval 1'],
+        10: ['lunch break', 'lunch'],
+        11: ['evening break', 'break 2', 'interval 2'],
+        12: ['games', 'diary', 'activity', 'evening duty']
+    };
+    
+    const normCorridor = (corridorTime || '').trim().toLowerCase();
+    
+    // Check direct substring matches
+    const aliases = periodNamesMap[period];
+    if (aliases) {
+        if (aliases.some(alias => normCorridor.includes(alias) || alias.includes(normCorridor))) {
+            return true;
+        }
+    }
+    
+    // Fallback: check if the period digit itself matches (for periods 1-8)
+    if (period >= 1 && period <= 8) {
+        if (normCorridor.includes(`period ${period}`) || normCorridor.includes(`p${period}`)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function findSubstituteForPeriod(req, activeSubs, teachers, timetable, absentees, exceptedMap = {}, weeklySubMap = {}, timingsMap = [], odNames = [], corridorDuties = []) {
     const { day, date, period, absentTeacher, subject } = req;
     const isSupervision = [0, 9, 10, 11, 12].includes(period);
     const periodKey = `Period_${period}`;
@@ -3075,6 +3163,13 @@ function findSubstituteForPeriod(req, activeSubs, teachers, timetable, absentees
         
         // Skip teachers who are on OD today
         if (odNames.includes(name)) return;
+        
+        // Skip teachers who are busy with Corridor Duty during this period/slot
+        const isBusyWithCorridor = corridorDuties.some(c => 
+            c.duty_teacher === name && 
+            isPeriodMatchingCorridorTime(period, c.corridor_time)
+        );
+        if (isBusyWithCorridor) return;
         
         // Skip teachers who are in the exceptions list for this period
         if (exceptedMap.hasOwnProperty(name) && isPeriodCoveredByTiming(exceptedMap[name], period, timingsMap)) return;
