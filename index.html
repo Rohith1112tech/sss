@@ -587,8 +587,12 @@
             <!-- Global Assignment Form -->
             <form id="assign-corridor-form" style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:24px; align-items:flex-end;">
               <div class="form-group" style="margin-bottom:0; flex:1; min-width:200px;">
-                <label for="global-corridor-time-input">Corridor Time / Timing</label>
-                <input type="text" id="global-corridor-time-input" required placeholder="e.g. Morning Break or 11:20" list="corridor-timings-list" style="width:100%; height:38px; padding:8px; border-radius:6px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary);">
+                <label for="global-corridor-name-input">Corridor / Location</label>
+                <input type="text" id="global-corridor-name-input" required placeholder="e.g. Ground Floor, Block A" style="width:100%; height:38px; padding:8px; border-radius:6px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary);">
+              </div>
+              <div class="form-group" style="margin-bottom:0; flex:1; min-width:200px;">
+                <label for="global-corridor-time-input">Timings</label>
+                <input type="text" id="global-corridor-time-input" required placeholder="e.g. Morning Break or Period 4" list="corridor-timings-list" style="width:100%; height:38px; padding:8px; border-radius:6px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary);">
               </div>
               <div class="form-group" style="margin-bottom:0; flex:1; min-width:200px;">
                 <label for="global-corridor-teacher-select">Duty Teacher</label>
@@ -603,7 +607,8 @@
               <table style="width:100%; border-collapse:collapse; text-align:center; font-size:13px;">
                 <thead>
                   <tr>
-                    <th>Corridor Time</th>
+                    <th>Corridor / Location</th>
+                    <th>Timings</th>
                     <th>Assigned Duty Teacher (Non Class Teachers Only)</th>
                     <th style="width:100px;">Action</th>
                   </tr>

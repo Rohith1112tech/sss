@@ -1989,7 +1989,7 @@ function renderCorridorDutyTab() {
         const dailyCorridorDuties = (state.corridorDuties || []).filter(cd => cd.Date === selectedDate);
         
         if (dailyCorridorDuties.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-secondary); padding:16px;">No corridor duties assigned for this date.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-secondary); padding:16px;">No corridor duties assigned for this date.</td></tr>';
         } else {
             dailyCorridorDuties.forEach(d => {
                 const tr = document.createElement('tr');
@@ -1999,6 +1999,7 @@ function renderCorridorDutyTab() {
                     </button>
                 `;
                 tr.innerHTML = `
+                    <td style="padding:12px;"><strong>${d.Corridor_Name}</strong></td>
                     <td style="padding:12px;"><strong>${d.Corridor_Time}</strong></td>
                     <td style="padding:12px; font-weight:600; color:var(--primary-color);">${d.Duty_Teacher}</td>
                     <td style="padding:12px;">${actionHTML}</td>
@@ -2012,22 +2013,25 @@ function renderCorridorDutyTab() {
 async function handleAssignCorridorDuty(e) {
     e.preventDefault();
     const date = document.getElementById('selected-date').value;
+    const nameInput = document.getElementById('global-corridor-name-input').value;
     const timeInput = document.getElementById('global-corridor-time-input').value;
     const teacherSelect = document.getElementById('global-corridor-teacher-select').value;
     
-    if (!timeInput || !teacherSelect || !date) return;
+    if (!nameInput || !timeInput || !teacherSelect || !date) return;
     
     await fetch(`${API_BASE}/corridor-duty`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             Date: date,
+            Corridor_Name: nameInput,
             Corridor_Time: timeInput,
             Duty_Teacher: teacherSelect
         })
     });
     
-    // Clear the time input for subsequent additions
+    // Clear the inputs for subsequent additions
+    document.getElementById('global-corridor-name-input').value = '';
     document.getElementById('global-corridor-time-input').value = '';
     
     await fetchState();
