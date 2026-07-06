@@ -1964,14 +1964,8 @@ function renderCorridorDutyTab() {
     
     // Populate Duty Teacher dropdown
     const globalTeacherSelect = document.getElementById('global-corridor-teacher-select');
-    const dailyODList = (state.odList || []).filter(item => item.Date === selectedDate);
-    const absentNames = state.absentees.filter(a => a.Date === selectedDate && a.Status === 'Absent').map(a => a.Teacher_Name);
-    const odNamesForDate = dailyODList.map(item => item.Teacher_Name);
-    
     const eligibleDutyTeachers = state.teachers.filter(t => 
-        t.Teacher_Type === 'Non Class Teacher' && 
-        !absentNames.includes(t.Teacher_Name) && 
-        !odNamesForDate.includes(t.Teacher_Name)
+        t.Teacher_Type === 'Non Class Teacher'
     );
     
     if (globalTeacherSelect) {
